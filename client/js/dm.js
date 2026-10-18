@@ -6,7 +6,7 @@ import { startAbility, abilitySummary, distance } from './abilities.js';
 
 const gameId = location.pathname.split('/').pop();
 const me = await api('GET', '/api/me');
-if (!me.dm) location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
+if (!me.dm) location.href = `/dm/login?next=${encodeURIComponent(location.pathname)}`;
 let content = await api('GET', '/api/content');
 let heroById = new Map(content.characters.map((c) => [c.id, c]));
 
@@ -36,9 +36,9 @@ socket.on('contentChanged', async () => {
   loadTemplates();
   if (state) render();
 });
-socket.on('fatal', (msg) => { toast(msg, 'error'); setTimeout(() => { location.href = '/'; }, 1500); });
+socket.on('fatal', (msg) => { toast(msg, 'error'); setTimeout(() => { location.href = '/dm'; }, 1500); });
 socket.on('connect_error', (err) => {
-  if (err.message === 'unauthorized') location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
+  if (err.message === 'unauthorized') location.href = `/dm/login?next=${encodeURIComponent(location.pathname)}`;
   else toast('Connection problem — retrying…', 'error');
 });
 

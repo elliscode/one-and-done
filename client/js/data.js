@@ -2,7 +2,7 @@ import { API_BASE } from './config.js';
 import { $, h, fill, api, toast } from './common.js';
 
 const me = await api('GET', '/api/me');
-if (!me.dm) location.href = '/login?next=/data';
+if (!me.dm) location.href = '/dm/login?next=/dm/data';
 
 const LABELS = { characters: '🛡 Characters (heroes)', monsters: '👹 Monsters', npcs: '🧙 NPCs', acts: '✋ Acts', items: '🧪 Items' };
 const SINGLE_FILES = { acts: 'acts.json', items: 'items.json' };

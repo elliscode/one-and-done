@@ -157,11 +157,25 @@ export function createServer({
   app.delete('/api/games/:id', requireDm, handle((req) => ({ ok: service.deleteGame(req.params.id) })));
 
   // ---- pages ----
+  // The DM app lives under /dm; / is a landing page. Old paths redirect (keeping the query
+  // string, e.g. ?next=) so bookmarks keep working.
   const page = (file) => (req, res) => res.sendFile(join(clientDir, file));
-  app.get('/', page('index.html'));
-  app.get('/login', page('login.html'));
-  app.get('/scenes/:id', page('scene-editor.html'));
-  app.get('/games/:id', page('dm-game.html'));
+  const moved = (to) => (req, res) => {
+    const q = req.originalUrl.indexOf('?');
+    res.redirect(301, to(req) + (q >= 0 ? req.originalUrl.slice(q) : ''));
+  };
+  app.get('/', page('landing.html'));
+  app.get('/dm', page('index.html'));
+  app.get('/dm/login', page('login.html'));
+  app.get('/dm/scenes/:id', page('scene-editor.html'));
+  app.get('/dm/games/:id', page('dm-game.html'));
+  app.get('/dm/assets', page('assets.html'));
+  app.get('/dm/data', page('data.html'));
+  app.get('/login', moved(() => '/dm/login'));
+  app.get('/scenes/:id', moved((req) => `/dm/scenes/${encodeURIComponent(req.params.id)}`));
+  app.get('/games/:id', moved((req) => `/dm/games/${encodeURIComponent(req.params.id)}`));
+  app.get('/assets', moved(() => '/dm/assets'));
+  app.get('/data', moved(() => '/dm/data'));
   // Player page, with per-game link-preview metadata rendered into the HTML for crawlers.
   app.get('/g/:token', (req, res) => {
     const base = (publicUrl || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
@@ -170,8 +184,6 @@ export function createServer({
     res.set('Cache-Control', 'no-cache');
     res.type('html').send(html);
   });
-  app.get('/assets', page('assets.html'));
-  app.get('/data', page('data.html'));
   // No caching so replaced uploads show up immediately (ETags still avoid re-downloads). The CSP
   // keeps an uploaded SVG from running scripts if someone opens it directly.
   app.use('/static', (req, res, next) => {

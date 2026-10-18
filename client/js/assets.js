@@ -2,7 +2,7 @@ import { API_BASE } from './config.js';
 import { $, h, fill, api, toast, copyText } from './common.js';
 
 const me = await api('GET', '/api/me');
-if (!me.dm) location.href = '/login?next=/assets';
+if (!me.dm) location.href = '/dm/login?next=/dm/assets';
 
 const FOLDERS = [
   { id: 'backgrounds', label: '🗺 Backgrounds' },

@@ -1,7 +1,7 @@
 import { $, $$, h, api, toast, copyText } from './common.js';
 
 const me = await api('GET', '/api/me');
-if (!me.dm) location.href = '/login';
+if (!me.dm) location.href = '/dm/login';
 
 const joinUrl = (token) => `${location.origin}/g/${token}`;
 
@@ -26,7 +26,7 @@ async function loadGames() {
     list.append(h('div.list-item', {},
       h('div.grow', {}, h('div.name', {}, g.name), h('div.muted', {}, bits.join(' · '))),
       h('button.small', { onclick: () => copyText(joinUrl(g.joinToken)) }, '🔗 Copy player link'),
-      h('a.btn.primary', { href: `/games/${g.id}` }, 'Open'),
+      h('a.btn.primary', { href: `/dm/games/${g.id}` }, 'Open'),
       h('button.small.danger', {
         onclick: async () => {
           if (!confirm(`Delete "${g.name}"? Its players, chat and live state will be lost. Scene templates are kept.`)) return;
@@ -47,7 +47,7 @@ async function loadScenes() {
     list.append(h('div.list-item', {},
       s.background ? h('img.thumb', { src: s.background, alt: '' }) : h('div.thumb'),
       h('div.grow', {}, h('div.name', {}, s.name), h('div.muted', {}, `Edited ${new Date(s.updatedAt).toLocaleString()}`)),
-      h('a.btn.primary', { href: `/scenes/${s.id}` }, 'Edit'),
+      h('a.btn.primary', { href: `/dm/scenes/${s.id}` }, 'Edit'),
       h('button.small', {
         onclick: async () => {
           const full = await api('GET', `/api/scenes/${s.id}`);
@@ -77,12 +77,12 @@ $('#new-scene').addEventListener('click', async () => {
   const s = await api('POST', '/api/scenes', {
     name: 'New scene', background: null, grid: { cols: 20, rows: 14, cellSize: 64 },
   });
-  location.href = `/scenes/${s.id}`;
+  location.href = `/dm/scenes/${s.id}`;
 });
 
 $('#logout').addEventListener('click', async () => {
   await api('POST', '/api/logout');
-  location.href = '/login';
+  location.href = '/dm/login';
 });
 
 // Global role strength (presets 1–5).

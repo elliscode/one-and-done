@@ -104,6 +104,20 @@ The browser code in `client/` is shared. Two files are per-deployment:
 | `/dm` | `{ gameId }` + DM cookie | `cmd`, `chat`, `ping` → `{ ok, error?, result? }` | `state`, `history`, `feed`, `fx`, `ping`, `contentChanged`, `fatal`, `connect_error` (an `Error` whose message is `'unauthorized'` → go to login) |
 | `/play` | `{ joinToken, playerId?, seatSecret? }` | `join` → `{ ok, playerId, seatSecret }`, and `cmd`, `chat`, `ping` | The same as `/dm`, plus `seatInvalid` |
 
+**Page paths.** A shell must serve these pages, because the client links between them with absolute paths. Every page loads `/css/…`, `/js/…` and `/favicon.svg` from the root.
+
+| Path | Page | Notes |
+|---|---|---|
+| `/` | landing | `client/landing.html` self-hosted; a deployment may serve its own |
+| `/dm` | `index.html` | DM home (games, scenes, settings) |
+| `/dm/login` | `login.html` | `?next=` is where to go after login (default `/dm`) |
+| `/dm/games/:id` | `dm-game.html` | |
+| `/dm/scenes/:id` | `scene-editor.html` | |
+| `/dm/assets`, `/dm/data` | `assets.html`, `data.html` | |
+| `/g/:token` | `play.html` | Player page, with link-preview tags |
+
+The pre-`/dm` paths (`/login`, `/games/:id`, `/scenes/:id`, `/assets`, `/data`) should redirect to their `/dm/…` equivalents, keeping the query string.
+
 A shell must keep these event names and payloads. `server/sockets.js` is the reference implementation.
 
 ## Part 4: Notes for the cloud shell

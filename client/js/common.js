@@ -52,7 +52,7 @@ export async function api(method, url, body) {
   });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && !url.includes('/login')) {
-    location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
+    location.href = `/dm/login?next=${encodeURIComponent(location.pathname)}`;
     throw new Error('Login required');
   }
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
