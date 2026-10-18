@@ -83,9 +83,9 @@ nextDeadline(state) → { at, cmd } | null
 ```
 At time `at`, dispatch `cmd` as `{ role: 'system' }`. Call it again after every successful command and replace any pending wake-up. A stale wake-up is harmless: `combat.timerExpired` checks `phaseEndsAt`.
 
-**Pausing the phase timer (optional for a shell).** A shell whose clock depends on the DM being connected can dispatch these as `{ role: 'system' }`:
-- `combat.timerPause` when the game's last DM connection drops. It stores the time left in `combat.pausedMs`, clears `phaseEndsAt` (so `nextDeadline` returns null) and logs "DM connection lost — timer stopped".
-- `combat.timerResume` when a DM is back. It sets `phaseEndsAt = now + pausedMs`.
+**Pausing the phase timer (optional for a shell).** A shell whose clock depends on the DM can dispatch these as `{ role: 'system' }`:
+- `combat.timerPause` while the DM is away: the game's last DM connection dropped, or the DM has been idle for several rounds. It stores the time left in `combat.pausedMs`, clears `phaseEndsAt` (so `nextDeadline` returns null) and logs "Timer paused — waiting for the DM".
+- `combat.timerResume` when the DM is back. It sets `phaseEndsAt = now + pausedMs` and logs "The DM is back — timer resumed".
 
 Both fail harmlessly when there's nothing to pause or resume. Starting, advancing or ending combat, and `combat.setTimer`, all clear a pause. The self-hosted server keeps its own clock and doesn't send them.
 

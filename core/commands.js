@@ -662,15 +662,16 @@ def('combat.setTimer', { who: 'dm' }, (ctx) => {
   ctx.log('combat', seconds ? `Phase timer set to ${seconds}s` : 'Phase timer off', { dmOnly: !c.active });
 });
 
-// A shell whose phase clock depends on the DM being connected (the cloud shell, where the DM's
-// browser drives it) stops the timer when the DM drops and restarts it with the same time left
-// when they're back. The self-hosted server keeps its own clock and never sends these.
+// A shell whose phase clock depends on the DM (the cloud shell, where the DM's browser drives it)
+// stops the timer while the DM is away (disconnected, or idle for several rounds) and restarts it
+// with the same time left when they're back. The self-hosted server keeps its own clock and never
+// sends these.
 def('combat.timerPause', { who: 'system' }, (ctx) => {
   const c = ctx.state.combat;
   if (!c.active || !c.phaseEndsAt) fail('No phase timer is running');
   c.pausedMs = Math.max(0, c.phaseEndsAt - ctx.now);
   c.phaseEndsAt = null;
-  ctx.log('combat', '⏸ DM connection lost — timer stopped');
+  ctx.log('combat', '⏸ Timer paused — waiting for the DM');
 });
 
 def('combat.timerResume', { who: 'system' }, (ctx) => {
@@ -678,7 +679,7 @@ def('combat.timerResume', { who: 'system' }, (ctx) => {
   if (!c.active || c.pausedMs == null) fail('The phase timer is not paused');
   c.phaseEndsAt = ctx.now + c.pausedMs;
   c.pausedMs = null;
-  ctx.log('combat', '▶ DM is back — timer resumed');
+  ctx.log('combat', '▶ The DM is back — timer resumed');
 });
 
 export { entitiesInScene };

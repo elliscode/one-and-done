@@ -96,7 +96,7 @@ export function combatBar(el) {
     const phase = combat.phase === 'player' ? 'PLAYER PHASE' : 'DM PHASE';
     let timer = '', urgent = false;
     if (combat.pausedMs != null) {
-      timer = ' · ⏸ DM connection lost, timer stopped';
+      timer = ' · ⏸ Timer paused — waiting for the DM';
     } else if (combat.phaseEndsAt) {
       const left = Math.max(0, Math.ceil((combat.phaseEndsAt - (Date.now() + offset)) / 1000));
       timer = ` · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;

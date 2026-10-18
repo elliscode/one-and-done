@@ -12,14 +12,14 @@ In the cloud, content depends on the account that owns the game, and players hav
 
 ## 3. Pausing the phase timer when the DM drops
 
-The cloud has no server-side timers: the DM's browser tells the server when a phase runs out. While no DM is connected, nothing would advance the phase, so the cloud stops the timer instead. Players see "DM connection lost, timer stopped".
+The cloud has no server-side timers: the DM's browser tells the server when a phase runs out. While no DM is connected, nothing would advance the phase, so the cloud stops the timer instead. It also stops it when the DM's tab is open but nobody has touched it for 4 full rounds, so forgotten tabs don't cycle phases forever. Players see "Timer paused — waiting for the DM".
 
 - **New system commands:**
   - `combat.timerPause` keeps the time left in `combat.pausedMs` and clears `phaseEndsAt`.
   - `combat.timerResume` sets `phaseEndsAt = now + pausedMs`. 10 seconds left when the DM drops means 10 seconds left when they're back.
 - Starting, advancing or ending combat, and `combat.setTimer`, clear a pause.
 - `upgradeState` adds `pausedMs: null` to older games.
-- The combat bar shows `⏸ DM connection lost, timer stopped` while `pausedMs` is set.
+- The combat bar shows `⏸ Timer paused — waiting for the DM` while `pausedMs` is set.
 
 The self-hosted server keeps its own clock and never sends these commands.
 
