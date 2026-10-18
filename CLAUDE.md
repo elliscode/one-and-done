@@ -25,7 +25,7 @@ The game engine in `core/` is shared with a future serverless (AWS Lambda + Dyna
 
 ## Specs
 
-Feature specs go in `docs/` as `YYYY_MM_DD_NNN_SHORT_NAME.md`. Each one includes:
+Feature specs go in `docs/` as `YYYY_MM_DD_NNN_SHORT_NAME.md`. Specs for features that haven't been built yet go in `docs/proposals/`; move them up to `docs/` once implemented. Each one includes:
 
 ```
 ## Core/shell impact
