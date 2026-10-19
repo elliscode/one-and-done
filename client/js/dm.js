@@ -3,6 +3,7 @@ import { $, fill, $$, h, api, toast, sendCmd, sendPing, sendChat, popupMenu, clo
 import { Board } from './board.js';
 import { GameFeed } from './panel.js';
 import { startAbility, abilitySummary, distance } from './abilities.js';
+import { createPredictor } from './predict.js';
 
 const gameId = location.pathname.split('/').pop();
 const me = await api('GET', '/api/me');
@@ -10,7 +11,9 @@ if (!me.dm) location.href = `/dm/login?next=${encodeURIComponent(location.pathna
 let content = await api('GET', '/api/content');
 let heroById = new Map(content.characters.map((c) => [c.id, c]));
 
-let state = null;
+let state = null; // what the screen shows: the server's state plus predictions for commands in flight
+let serverState = null;
+const predictor = createPredictor({ onChange: () => { if (serverState) { state = predictor.view(serverState); render(); } } });
 let selectedId = null;
 let mode = null; // {type:'place', kind, def, scope} | {type:'target'|'cell', label, range, origin, ...}
 let spawnScope = 'scene';
@@ -23,7 +26,12 @@ const panel = new GameFeed($('#panel'), {
 });
 const bar = combatBar($('#combat-bar'));
 
-socket.on('state', (s) => { state = s; render(); });
+socket.on('state', (s) => {
+  serverState = s;
+  predictor.onState();
+  state = predictor.view(s);
+  render();
+});
 socket.on('history', (hist) => panel.setHistory(hist));
 socket.on('feed', (rows) => panel.add(rows));
 socket.on('fx', (list) => { for (const f of list) board.showFx(f.entityId, f.text, f.color, f.kind); });
@@ -92,7 +100,13 @@ const board = new Board($('#board'), {
   onPing: (p) => sendPing(socket, p),
   canDrag: () => !mode,
   // Shift-drag force-moves (skips movement budgets and frightened restrictions).
-  onTokenDrop: (t, x, y, e) => send({ type: 'move', entityId: t.id, x, y, force: !!e?.shiftKey }),
+  // The dropped token shows on its new square at once (the server confirms or reverts it).
+  onTokenDrop: (t, x, y, e) => {
+    const sceneId = state.activeSceneId;
+    predictor.run(() => send({ type: 'move', entityId: t.id, x, y, force: !!e?.shiftKey }), (s) => {
+      s.entities[t.id].positions[sceneId] = { x, y };
+    });
+  },
   onCellClick: (cell, e) => {
     if (mode?.type === 'place') return place(cell, e);
     if (mode?.type === 'cell') { const m = mode; setMode(null); return m.onCell(cell); }

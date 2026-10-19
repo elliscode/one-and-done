@@ -4,6 +4,7 @@ import { $, fill, h, toast, sendCmd, sendPing, sendChat, popupMenu, closeMenu, c
 import { Board } from './board.js';
 import { GameFeed } from './panel.js';
 import { startAbility, abilitySummary, distance, sideOf } from './abilities.js';
+import { createPredictor, squaresBetween } from './predict.js';
 
 const token = decodeURIComponent(location.pathname.split('/').pop());
 const SEAT_KEY = `one-and-done:seat:${token}`;
@@ -27,7 +28,9 @@ let content = await fetch(publicContentUrl).then((r) => r.json());
 let heroById = new Map(content.characters.map((c) => [c.id, c]));
 
 let seat = store.get(SEAT_KEY);
-let state = null;
+let state = null; // what the screen shows: the server's state plus predictions for commands in flight
+let serverState = null;
+const predictor = createPredictor({ onChange: () => { if (serverState) { state = predictor.view(serverState); render(); } } });
 let pickedRole = null;
 let mode = null; // null | {type:'move'} | {type:'target', ...}
 let fatal = null;
@@ -38,7 +41,12 @@ const panel = new GameFeed($('#panel'), {
 });
 const bar = combatBar($('#combat-bar'));
 
-socket.on('state', (s) => { state = s; render(); });
+socket.on('state', (s) => {
+  serverState = s;
+  predictor.onState();
+  state = predictor.view(s);
+  render();
+});
 socket.on('history', (hist) => panel.setHistory(hist));
 socket.on('feed', (rows) => panel.add(rows));
 socket.on('fx', (list) => { for (const f of list) board.showFx(f.entityId, f.text, f.color, f.kind); });
@@ -59,6 +67,54 @@ socket.on('contentChanged', async () => {
 socket.on('connect_error', () => toast('Connection problem — retrying…', 'error'));
 
 const send = (cmd) => sendCmd(socket, cmd);
+// Sends a command, showing `apply`'s predicted result until the server answers (see predict.js).
+const predicted = (cmd, apply) => (apply ? predictor.run(() => send(cmd), apply) : send(cmd));
+
+const blankTurn = () => ({ actions: 0, bonus: 0, moved: 0, abilitiesUsed: [], moves: [] });
+
+// A move the client can tell is legal (our hero, our window, on the grid, enough movement) shows at
+// once: the token on its new square and the squares spent. Anything else waits for the server.
+function movePrediction(me, x, y) {
+  const g = state.scene?.grid;
+  if (!me?.position || !g || me.status !== 'active') return null;
+  const a = availability();
+  const dist = squaresBetween(me.position, { x, y });
+  const fits = Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x + me.size.w <= g.cols && y + me.size.h <= g.rows;
+  if (!fits || a.dmPhase || (a.c.active && dist > a.moveLeft)) return null;
+  const movedAtSend = a.t.moved ?? 0;
+  const paying = a.c.active;
+  return (s) => {
+    const e = s.entities.find((x2) => x2.id === me.id);
+    e.position = { x, y };
+    if (paying) {
+      s.turn ??= blankTurn();
+      s.turn.moved = Math.max(s.turn.moved ?? 0, movedAtSend + dist);
+    }
+  };
+}
+
+// An action spent in combat (attack, act, item, ability): the buttons grey out at once. Outside
+// combat nothing is spent, so there's nothing to predict.
+function actionPrediction({ cost = 1, abilityId = null } = {}) {
+  const a = availability();
+  if (!a.c.active) return null;
+  const actionsAtSend = a.t.actions ?? 0;
+  const usedAtSend = (a.t.abilitiesUsed ?? []).filter((x) => x === abilityId).length;
+  return (s) => {
+    s.turn ??= blankTurn();
+    s.turn.moves = []; // acting locks in this phase's moves
+    if (cost > 0) s.turn.actions = Math.max(s.turn.actions ?? 0, actionsAtSend + cost);
+    if (abilityId) {
+      const used = (s.turn.abilitiesUsed ??= []);
+      if (used.filter((x) => x === abilityId).length <= usedAtSend) used.push(abilityId);
+    }
+  };
+}
+
+function moveMe(x, y) {
+  const me = myEntity();
+  return predicted({ type: 'move', entityId: me.id, x, y }, movePrediction(me, x, y));
+}
 
 // ---------- board ----------
 
@@ -66,7 +122,7 @@ const board = new Board($('#board'), {
   // Press and hold to ping. Errors (the players' 10-per-minute limit) show as a toast.
   onPing: (p) => sendPing(socket, p),
   canDrag: (t) => t.id === myEntity()?.id && !mode,
-  onTokenDrop: (t, x, y) => send({ type: 'move', entityId: t.id, x, y }),
+  onTokenDrop: (t, x, y) => moveMe(x, y),
   onTokenClick: (t, e, stack) => onTokenClick(t, e, stack),
   onCellClick: (cell) => onCellClick(cell),
 });
@@ -173,7 +229,13 @@ $('#undo-move').addEventListener('click', undoMove);
 function onCellClick(cell) {
   const me = myEntity();
   if (mode?.type === 'move') {
-    send({ type: 'move', entityId: me.id, x: cell.x, y: cell.y }).then((ok) => { if (ok) cancelMode(); });
+    // A move we can predict takes effect now, so leave move mode now too.
+    if (movePrediction(me, cell.x, cell.y)) {
+      cancelMode();
+      moveMe(cell.x, cell.y);
+    } else {
+      moveMe(cell.x, cell.y).then((ok) => { if (ok) cancelMode(); });
+    }
   }
   if (mode?.type === 'cell') {
     const m = mode;
@@ -218,7 +280,7 @@ function onSegment(seg, t, e) {
       disabled: !!note,
       onClick: () => setMode({
         type: 'target', label: `${atk.name}: choose a target`, range: Number(atk.range) || 1, filter: isFoe(a.me),
-        onTarget: (target) => send({ type: 'attack', entityId: a.me.id, attackId: atk.id, targetId: target.id }),
+        onTarget: (target) => predicted({ type: 'attack', entityId: a.me.id, attackId: atk.id, targetId: target.id }, actionPrediction()),
       }),
     })));
     return;
@@ -232,12 +294,12 @@ function onSegment(seg, t, e) {
         const ab = { ...def.ability, id: it.id, name: it.name };
         return {
           label: it.name, sub: [def.description, abilitySummary(ab), cost].filter(Boolean).join(' — '), disabled: !!why,
-          onClick: () => startAbility({ caster: a.me, ab, entities: () => state.entities, setMode, send: (cmd) => send({ ...cmd, type: 'item.use', itemId: it.id }), toast: null }),
+          onClick: () => startAbility({ caster: a.me, ab, entities: () => state.entities, setMode, send: (cmd) => predicted({ ...cmd, type: 'item.use', itemId: it.id }, actionPrediction({ cost: ab.actionCost ?? 1 })), toast: null }),
         };
       }
       return {
         label: it.name, sub: [def?.description, cost ? `Use (${cost})` : 'Use'].filter(Boolean).join(' — '), disabled: !!why,
-        onClick: () => send({ type: 'item.use', entityId: a.me.id, itemId: it.id }),
+        onClick: () => predicted({ type: 'item.use', entityId: a.me.id, itemId: it.id }, actionPrediction()),
       };
     });
     popupMenu(at.x + 60, at.y + 20, why ? `Inventory — ${why}` : 'Inventory', items.length ? items : [{ label: 'Empty', disabled: true }]);
@@ -256,12 +318,12 @@ function onSegment(seg, t, e) {
         label: ab.name,
         sub: [needsCombat ? 'combat only' : '', abilitySummary(ab), capped ? 'used this phase' : '', ab.description].filter(Boolean).join(' — '),
         disabled: blocked,
-        onClick: () => startAbility({ caster: a.me, ab, entities: () => state.entities, setMode, send, toast: null }),
+        onClick: () => startAbility({ caster: a.me, ab, entities: () => state.entities, setMode, send: (cmd) => predicted(cmd, actionPrediction({ cost: ab.actionCost ?? 1, abilityId: ab.id })), toast: null }),
       });
     }
     items.push({ heading: 'Actions' });
     for (const act of content.acts) {
-      items.push({ label: act.name, sub: act.roll ? `roll ${act.roll}` : '', disabled: !!why, onClick: () => send({ type: 'act', entityId: a.me.id, actId: act.id }) });
+      items.push({ label: act.name, sub: act.roll ? `roll ${act.roll}` : '', disabled: !!why, onClick: () => predicted({ type: 'act', entityId: a.me.id, actId: act.id }, actionPrediction()) });
     }
     const input = h('input', { placeholder: 'Something else… (e.g. Pull the rope)', maxLength: 80 });
     const roll = h('select', {}, ...['', '1d20', '1d12', '1d10', '1d8', '1d6', '1d4'].map((r) => h('option', { value: r }, r || 'no roll')));
@@ -269,7 +331,7 @@ function onSegment(seg, t, e) {
       onsubmit: (ev) => {
         ev.preventDefault();
         if (!input.value.trim()) return;
-        send({ type: 'act', entityId: a.me.id, text: input.value, roll: roll.value || null });
+        predicted({ type: 'act', entityId: a.me.id, text: input.value, roll: roll.value || null }, actionPrediction());
         closeMenu();
       },
     }, input, roll, h('button.small.primary', { type: 'submit', disabled: !!why }, 'Do it'));
