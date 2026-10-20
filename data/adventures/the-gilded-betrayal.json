@@ -11,13 +11,13 @@
     { "key": "vault", "template": "builtin:gilded-betrayal-vault" }
   ],
   "handouts": [
-    { "id": "builtin:gilded-betrayal-inside-prison", "scenes": [ "prison" ] },
-    { "id": "builtin:gilded-betrayal-outside-prison", "scenes": [ "outside" ] },
-    { "id": "builtin:gilded-betrayal-gator-swamp", "scenes": [ "swamp" ] },
-    { "id": "builtin:gilded-betrayal-town-square", "scenes": [ "square" ] },
-    { "id": "builtin:gilded-betrayal-docks", "scenes": [ "docks" ] },
-    { "id": "builtin:gilded-betrayal-island-entrance", "scenes": [ "island" ] },
-    { "id": "builtin:gilded-betrayal-vault", "scenes": [ "vault" ] }
+    { "id": "builtin:gilded-betrayal-inside-prison", "scenes": [ "prison" ], "revealed": true },
+    { "id": "builtin:gilded-betrayal-outside-prison", "scenes": [ "outside" ], "revealed": true },
+    { "id": "builtin:gilded-betrayal-gator-swamp", "scenes": [ "swamp" ], "revealed": true },
+    { "id": "builtin:gilded-betrayal-town-square", "scenes": [ "square" ], "revealed": true },
+    { "id": "builtin:gilded-betrayal-docks", "scenes": [ "docks" ], "revealed": true },
+    { "id": "builtin:gilded-betrayal-island-entrance", "scenes": [ "island" ], "revealed": true },
+    { "id": "builtin:gilded-betrayal-vault", "scenes": [ "vault" ], "revealed": true }
   ],
   "startScene": "prison"
 }

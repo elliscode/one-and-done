@@ -89,7 +89,7 @@ A game handout can be tied to some of the game's scenes (`sceneIds`, at most `MA
   - The DM top bar has a **📜 Handouts** button. The DM's viewer and the player's 📜 reader list the active scene's handouts first, under "📍 *scene name*". The rest go under a collapsible **Other handouts** group, collapsed while the scene has handouts.
   - The DM's viewer also shows Reveal/Hide and the DM notes.
 - **DM Handouts tab:** it's grouped the same way. Each row has a **📍** button (a checklist of the game's scenes) and a `📍 Training Yard, …` line.
-- **Adventure files:** a handout entry can be `{ "id": …, "scenes": [scene keys] }`. Training Grounds ties the welcome handout to the yard, and the bounty to the yard and the courtyard.
+- **Adventure files:** a handout entry can be `{ "id": …, "scenes": [scene keys], "revealed": true }`. `revealed` (added 2026-10-20) starts the handout visible to players, with no "shared" feed row. Training Grounds ties the welcome handout to the yard, and the bounty to the yard and the courtyard.
 
 ## Part 2: Built-in content
 

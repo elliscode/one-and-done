@@ -192,3 +192,17 @@ test('the DM can read an adventure\'s handouts before creating a game', async ()
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('adventure handouts can start revealed to players', () => {
+  const s = setup();
+  const scenes = [{ key: 'cave', template: 'builtin:fixture-cave' }];
+  const adv = validateAdventure({ name: 'Open book', scenes, handouts: [{ id: 'builtin:fixture-letter', revealed: true }, 'builtin:fixture-map'] });
+  assert.deepEqual(adv.handouts, [{ id: 'builtin:fixture-letter', revealed: true }, { id: 'builtin:fixture-map' }]);
+  assert.throws(() => validateAdventure({ name: 'x', scenes, handouts: [{ id: 'h', revealed: 'yes' }] }), /true or false/);
+  s.service.adventures = { get: (id) => (id === 'open' ? { id, ...adv } : null) };
+  const g = s.service.createGame('', { adventureId: 'open' });
+  const st = s.service.get(g.id).state;
+  assert.deepEqual(st.handoutOrder.map((id) => [st.handouts[id].title, st.handouts[id].revealed]), [['Fixture Letter', true], ['Fixture Map', false]]);
+  const feed = s.service.history(g.id, 'player').feed.map((f) => f.text);
+  assert.ok(!feed.some((t) => t.includes('shared')), 'no "shared" rows when a game starts revealed');
+});

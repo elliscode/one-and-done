@@ -348,16 +348,18 @@ def('adventure.load', { who: 'dm', clearsUndo: true }, (ctx) => {
   const handouts = adv.handouts.map((entry) => {
     const ho = ctx.handouts?.get(entry.id);
     if (!ho) fail(`This adventure needs the handout "${entry.id}", which doesn't exist`);
-    return { ho, scenes: entry.scenes ?? [] };
+    return { ho, scenes: entry.scenes ?? [], revealed: !!entry.revealed };
   });
   const ids = {};
   for (const s of scenes) ids[s.key] = addSceneFromTemplate(ctx, s.tpl, s.name ?? null).id;
   for (const s of scenes) {
     if (s.next?.length) ctx.state.scenes[ids[s.key]].next = s.next.map((key) => ids[key]);
   }
-  for (const { ho, scenes: keys } of handouts) {
+  for (const { ho, scenes: keys, revealed } of handouts) {
     const copy = addHandout(ctx, normalizeHandout({ title: ho.title, ...ho.data }), ho.id);
     if (keys.length) copy.sceneIds = keys.map((k) => ids[k]);
+    // Revealed from the start: no "shared" feed row, since nobody has joined yet.
+    if (revealed) copy.revealed = true;
   }
   const start = adv.startScene ? ids[adv.startScene] : ids[scenes[0].key];
   ctx.state.activeSceneId = start;

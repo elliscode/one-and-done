@@ -28,8 +28,9 @@ export function normalizeHandout(input = {}) {
 // Structural check of a built-in adventure file. Whether its scenes and handouts exist is checked
 // by whoever loads it (the shell when listing, adventure.load when running).
 //   { name, description?, scenes: [{ key?, template, name?, next?: [key] }],
-//     handouts?: [id | { id, scenes?: [key] }], startScene? }
-// Handouts come back as [{ id, scenes? }]; scenes ties the handout to those scenes in the game.
+//     handouts?: [id | { id, scenes?: [key], revealed?: true }], startScene? }
+// Handouts come back as [{ id, scenes?, revealed? }]; scenes ties the handout to those scenes in the
+// game, and revealed: true starts it visible to players.
 export function validateAdventure(input) {
   const bad = (msg) => { throw new GameError(msg); };
   if (!input || typeof input !== 'object' || Array.isArray(input)) bad('must be a JSON object');
@@ -73,7 +74,12 @@ export function validateAdventure(input) {
     const tied = entry.scenes ?? [];
     if (!Array.isArray(tied) || tied.some((k) => typeof k !== 'string')) bad(`handouts[${i}].scenes must be a list of scene keys`);
     for (const k of tied) if (!keys.has(k)) bad(`handouts[${i}].scenes names "${k}", which isn't one of the scene keys`);
-    handouts.push(tied.length ? { id: entry.id, scenes: [...new Set(tied)] } : { id: entry.id });
+    if (entry.revealed !== undefined && typeof entry.revealed !== 'boolean') bad(`handouts[${i}].revealed must be true or false`);
+    handouts.push({
+      id: entry.id,
+      ...(tied.length ? { scenes: [...new Set(tied)] } : {}),
+      ...(entry.revealed ? { revealed: true } : {}),
+    });
   }
   const startScene = input.startScene ?? null;
   if (startScene !== null && !keys.has(startScene)) bad(`"startScene" must be one of the scene keys (${[...keys].join(', ')})`);
