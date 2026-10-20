@@ -1,0 +1,5 @@
+{
+  "title": "Gator Swamp",
+  "text": "You've ended up in the Gator swamp. The goal is simple:\n\n- Navigate past the gators without falling in (DM decides how\n- Make it to the bottom left of the map to get to the docks!",
+  "dmNotes": "# Who's in this scene\n\n- the party\n- the gators\n\n## What you need to do\n\n- If the party chose the poisonous bramble path, move the party to the bottom right of the map, which means they need to cross less bridges\n- If the party chose the northern forest path, they can stay where they spawn in and they will need to cross four bridges\n\nEach party member needs to make a check to cross each bridge. You can either have them\n\n- Require the party to get an average roll of over 10 on each bridge to cross\n- Or instead, require everyone in the party to roll higher than a 2\n\nIf either condition is not met, the swamp gators attack the party."
+}

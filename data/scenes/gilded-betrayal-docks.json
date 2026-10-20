@@ -1,0 +1,34 @@
+{
+  "name": "The Docks",
+  "background": "/static/backgrounds/tgb-the-docks.webp",
+  "bgScale": 1,
+  "grid": {
+    "cols": 30,
+    "rows": 20,
+    "cellSize": 52,
+    "offsetX": 0,
+    "offsetY": 0,
+    "color": "#ffffff",
+    "opacity": 0.25
+  },
+  "spawn": {
+    "x": 23,
+    "y": 0
+  },
+  "entities": [
+    { "kind": "npc", "defId": "lucien-voss", "x": 26, "y": 1, "name": "Lucien Voss" },
+    { "kind": "npc", "defId": "naval-captain", "x": 2, "y": 11 },
+    { "kind": "npc", "defId": "weathered-captain", "x": 8, "y": 11 },
+    { "kind": "npc", "defId": "corsair-captain", "x": 28, "y": 11 },
+    { "kind": "npc", "defId": "deckhand", "x": 25, "y": 9 },
+    { "kind": "npc", "defId": "boatswain", "x": 15, "y": 14 },
+    { "kind": "npc", "defId": "bosuns-mate", "x": 9, "y": 10 },
+    { "kind": "npc", "defId": "gunner", "x": 3, "y": 10 },
+    { "kind": "npc", "defId": "lookout", "x": 3, "y": 7 },
+    { "kind": "npc", "defId": "ships-cook", "x": 16, "y": 2 },
+    { "kind": "npc", "defId": "grizzled-sailor", "x": 17, "y": 1 },
+    { "kind": "npc", "defId": "sailor-brute", "x": 26, "y": 11 },
+    { "kind": "npc", "defId": "pub-worker", "x": 21, "y": 1 },
+    { "kind": "npc", "defId": "merchant", "x": 8, "y": 2 }
+  ]
+}

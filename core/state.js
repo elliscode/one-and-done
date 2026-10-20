@@ -15,6 +15,8 @@ export const PLAYER_COLORS = [
   '#469990', // teal
 ];
 export const DM_COLOR = '#d4af37';
+// Branching scene links (scene.setNext, adventure files): at most this many next scenes per scene.
+export const MAX_SCENE_LINKS = 8;
 
 // Brings a saved game up to date with the current rules. Players whose color is no longer in the
 // bank (red, removed) get the first free one; games from before game options or handouts get the

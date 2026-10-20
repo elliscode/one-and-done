@@ -30,7 +30,7 @@ test('players see only revealed handouts, never DM notes or the source', () => {
   ok(s.run(DM, { type: 'handout.create', title: 'Hidden', text: 'not yet' }));
   assert.deepEqual(playerView(s, a).handouts, []);
   ok(s.run(DM, { type: 'handout.reveal', handoutId: shown }));
-  assert.deepEqual(playerView(s, a).handouts, [{ id: shown, title: 'Map', text: null, image: '/static/handouts/map.webp' }]);
+  assert.deepEqual(playerView(s, a).handouts, [{ id: shown, title: 'Map', text: null, image: '/static/handouts/map.webp', forScene: false }]);
   // The DM sees everything, including notes.
   const dm = projectForDm(s.state(), presence);
   assert.equal(Object.keys(dm.handouts).length, 2);
@@ -97,4 +97,33 @@ test('game state with handouts survives a JSON round-trip', () => {
   const s = setup();
   ok(s.run(DM, { type: 'handout.create', title: 'Note', text: 'hi' }));
   assert.deepEqual(JSON.parse(JSON.stringify(s.state())), s.state());
+});
+
+test('handouts can be tied to scenes; players only learn whether it is the current one', () => {
+  const s = setup();
+  const a = s.join('Ana');
+  const cave = ok(s.run(DM, { type: 'scene.add', templateId: s.tpl.id })).sceneId;
+  const forest = ok(s.run(DM, { type: 'scene.add', templateId: s.tpl2.id })).sceneId;
+  const id = ok(s.run(DM, { type: 'handout.create', title: 'Cave map', text: 'x', sceneIds: [cave] })).handoutId;
+  assert.deepEqual(s.state().handouts[id].sceneIds, [cave]);
+  ok(s.run(DM, { type: 'handout.setScenes', handoutId: id, sceneIds: [cave, forest, cave] }));
+  assert.deepEqual(s.state().handouts[id].sceneIds, [cave, forest]);
+  assert.equal(s.run(DM, { type: 'handout.setScenes', handoutId: id, sceneIds: ['nope'] }).error, 'Unknown scene');
+  assert.equal(s.run(a, { type: 'handout.setScenes', handoutId: id, sceneIds: [] }).error, 'Not allowed');
+
+  ok(s.run(DM, { type: 'handout.reveal', handoutId: id }));
+  ok(s.run(DM, { type: 'handout.setScenes', handoutId: id, sceneIds: [cave] }));
+  ok(s.run(DM, { type: 'scene.activate', sceneId: forest }));
+  assert.equal(playerView(s, a).handouts[0].forScene, false);
+  ok(s.run(DM, { type: 'scene.activate', sceneId: cave }));
+  const seen = playerView(s, a).handouts[0];
+  assert.equal(seen.forScene, true);
+  assert.equal('sceneIds' in seen, false, 'scene ids stay private');
+
+  // Removing the scene unties it; an empty list clears the field.
+  ok(s.run(DM, { type: 'scene.remove', sceneId: cave }));
+  assert.equal('sceneIds' in s.state().handouts[id], false);
+  ok(s.run(DM, { type: 'handout.setScenes', handoutId: id, sceneIds: [forest] }));
+  ok(s.run(DM, { type: 'handout.setScenes', handoutId: id, sceneIds: [] }));
+  assert.equal('sceneIds' in s.state().handouts[id], false);
 });

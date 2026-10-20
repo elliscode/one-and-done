@@ -34,6 +34,11 @@ The same shape the scene editor saves:
 - `grid.cols` and `grid.rows` (1–100) and `cellSize` (16–256 px) should match the background, scaled by `bgScale`.
 - `spawn` is where heroes appear. Without it, they appear in the bottom-left corner.
 - `entities` are monsters (`"kind": "monster"`) or NPCs (`"kind": "npc"`), with `defId` set to a definition id from `data/monsters/` or `data/npcs/`. `name` is optional. Squares are 0-based from the top-left. An unknown `defId` is a warning, and that creature is skipped.
+- Two optional flags set a creature's starting state:
+  - `"hostile": true` makes an NPC start hostile, e.g. guards hunting the party. Monsters are already hostile.
+  - `"dead": true` makes a creature start dead, e.g. a body to investigate.
+
+  The scene editor keeps these flags but can't set them, so add them by hand.
 - Tip: the easiest way to get the grid and positions right is to build the scene in the scene editor, then copy its values into the file.
 
 ## Handout: `data/handouts/<id>.json`
@@ -50,7 +55,7 @@ The same shape the scene editor saves:
 | Field | Limit | Notes |
 |---|---|---|
 | `title` | 80 characters | Defaults to "Untitled handout" |
-| `image` | a `/static/...` path | Optional cover image, shown above the text. Players can click it to see it full size. |
+| `image` | a `/static/...` path | Optional cover image, shown above the text. Players can click it (or any inline image) to open it in a new tab. |
 | `text` | 8,000 characters | Optional Markdown (see below). In JSON, line breaks are `\n`. |
 | `dmNotes` | 2,000 characters | Optional. Never sent to players. |
 
@@ -65,17 +70,21 @@ A handout needs `text`, `image`, or both.
   "name": "Training Grounds",
   "description": "A short tutorial one-shot…",
   "scenes": [
-    { "key": "yard", "template": "builtin:training-yard" },
+    { "key": "yard", "template": "builtin:training-yard", "next": ["courtyard"] },
     { "key": "courtyard", "template": "builtin:courtyard-ambush", "name": "The Old Courtyard" }
   ],
-  "handouts": ["builtin:welcome-to-one-and-done", "builtin:notice-board-bounty"],
+  "handouts": [
+    { "id": "builtin:welcome-to-one-and-done", "scenes": ["yard"] },
+    "builtin:notice-board-bounty"
+  ],
   "startScene": "yard"
 }
 ```
 
 - `name` (60 characters) is also the new game's default name. `description` (500 characters) is shown on the DM home page.
 - `scenes` (1–30) are added in this order. `template` must be a built-in scene id. `key` is a short label used by `startScene` (default `scene-1`, `scene-2`, …). `name` optionally renames the scene in this game.
-- `handouts` (up to 40) are built-in handout ids. They start hidden, and the DM reveals them during play.
+- `next` (optional, up to 8) lists the keys of the scenes that can follow this one. In the game, the DM's Scenes tab highlights them while this scene is active (see the branching scene navigator). Links are one-way, so add a link back if the party can return. A link to an unknown key, or to the scene itself, is an error.
+- `handouts` (up to 40) are built-in handout ids. They start hidden, and the DM reveals them during play. To tie a handout to scenes, write `{ "id": "builtin:…", "scenes": ["<scene key>", …] }` instead of the plain id. While one of those scenes is active, the DM's and players' handout viewers list it first, under the scene's name. Tying doesn't reveal anything by itself.
 - `startScene` is the key of the scene that's active when the game starts (default: the first scene).
 - An adventure that points at a scene or handout that doesn't exist is hidden from the list, with a warning in the server log.
 

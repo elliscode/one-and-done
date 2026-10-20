@@ -1,4 +1,5 @@
 import { $, $$, h, api, toast, copyText } from './common.js';
+import { openReader } from './handouts.js';
 
 const me = await api('GET', '/api/me');
 if (!me.dm) location.href = '/dm/login';
@@ -31,6 +32,22 @@ async function loadAdventures() {
   describe();
   bar.replaceChildren(
     h('span.adventure-label', {}, '📖 New game from adventure'), pick, about,
+    h('button', {
+      title: 'Read this adventure\'s handouts, with DM notes',
+      onclick: async () => {
+        const a = advs.find((x) => x.id === pick.value);
+        try {
+          const list = await api('GET', `/api/adventures/${encodeURIComponent(pick.value)}/handouts`);
+          openReader(list, {
+            showDmNotes: true,
+            emptyText: `${a?.name ?? 'This adventure'} has no handouts.`,
+            status: (ho) => (ho.scenes.length ? `📍 ${ho.scenes.join(', ')}` : 'Not tied to a scene'),
+          });
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      },
+    }, '📜 Handouts'),
     h('button.primary', {
       onclick: async () => {
         try {

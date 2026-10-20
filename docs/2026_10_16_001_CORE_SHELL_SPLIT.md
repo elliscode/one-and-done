@@ -102,7 +102,7 @@ The browser code in `client/` is shared. Two files are per-deployment:
   - `/api/...` requests use `credentials: 'include'`, so a deployment can put the API on another origin and still send its cookie.
   - The player page fetches `/api/content/public?joinToken=<token>`, so a multi-account deployment knows whose content the game uses. Self-hosted ignores the query string.
   - The DM handout library mirrors scene templates: `GET/POST /api/handouts` and `GET/PUT/DELETE /api/handouts/:id`. The list items are `{ id, title, image, hasText, updatedAt, builtIn? }`. `PUT` and `DELETE` on a `builtin:` id return 400.
-  - `GET /api/adventures` returns `[{ id, name, description, scenes, handouts }]` (scene and handout counts). `POST /api/games` also accepts `{ adventureId }`.
+  - `GET /api/adventures` returns `[{ id, name, description, scenes, handouts }]` (scene and handout counts). `GET /api/adventures/:id/handouts` returns that adventure's handouts in full: `[{ id, title, text, image, dmNotes, scenes: [scene names] }]`, for the DM to read before creating a game. `POST /api/games` also accepts `{ adventureId }`.
   - The asset folders are `backgrounds`, `tokens`, `images` and `handouts`.
 - **`client/js/transport.js`:** `connect(namespace, auth)` returns `{ on(event, fn), request(event, payload, { timeoutMs }) → Promise, setAuth(auth) }`.
 

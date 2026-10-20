@@ -1,0 +1,23 @@
+{
+  "name": "The Gilded Betrayal",
+  "description": "Framed for murder and due to hang today, the party takes a deal from their lawyer, Lucien Voss: freedom in exchange for a share of a hidden vault. But who really betrayed whom? Seven scenes, from the prison cells to a dragon's hoard.",
+  "scenes": [
+    { "key": "prison", "template": "builtin:gilded-betrayal-inside-prison", "next": [ "outside" ] },
+    { "key": "outside", "template": "builtin:gilded-betrayal-outside-prison", "next": [ "swamp", "square" ] },
+    { "key": "swamp", "template": "builtin:gilded-betrayal-gator-swamp", "next": [ "docks" ] },
+    { "key": "square", "template": "builtin:gilded-betrayal-town-square", "next": [ "docks" ] },
+    { "key": "docks", "template": "builtin:gilded-betrayal-docks", "next": [ "island" ] },
+    { "key": "island", "template": "builtin:gilded-betrayal-island-entrance", "next": [ "vault" ] },
+    { "key": "vault", "template": "builtin:gilded-betrayal-vault" }
+  ],
+  "handouts": [
+    { "id": "builtin:gilded-betrayal-inside-prison", "scenes": [ "prison" ] },
+    { "id": "builtin:gilded-betrayal-outside-prison", "scenes": [ "outside" ] },
+    { "id": "builtin:gilded-betrayal-gator-swamp", "scenes": [ "swamp" ] },
+    { "id": "builtin:gilded-betrayal-town-square", "scenes": [ "square" ] },
+    { "id": "builtin:gilded-betrayal-docks", "scenes": [ "docks" ] },
+    { "id": "builtin:gilded-betrayal-island-entrance", "scenes": [ "island" ] },
+    { "id": "builtin:gilded-betrayal-vault", "scenes": [ "vault" ] }
+  ],
+  "startScene": "prison"
+}

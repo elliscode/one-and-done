@@ -1,5 +1,5 @@
 import { $, h, fill, api, toast } from './common.js';
-import { handoutBody, pickImage } from './handouts.js';
+import { handoutBody, pickImage, dmNotesBox } from './handouts.js';
 
 const TEXT_MAX = 8000;
 const NOTES_MAX = 2000;
@@ -46,6 +46,7 @@ function render() {
   const title = $('#title').value.trim() || 'Untitled handout';
   fill($('#preview'), h('h2.reader-title', {}, title),
     text.trim() || image ? handoutBody({ title, text, image }) : h('p.muted', {}, 'Add some text or a cover image.'));
+  fill($('#notes-preview'), dmNotesBox($('#notes').value.trim()));
 }
 
 $('#insert-image').addEventListener('click', async () => {

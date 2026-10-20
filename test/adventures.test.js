@@ -10,6 +10,7 @@ import { TemplateStore } from '../server/templates.js';
 import { HandoutStore } from '../server/handouts.js';
 import { GameService } from '../server/games/service.js';
 import { validateAdventure } from '../core/handouts.js';
+import { createServer } from '../server/index.js';
 
 test('built-ins load from data/ with builtin: ids and show up in the libraries', () => {
   const s = setup();
@@ -62,7 +63,7 @@ test('adventure.load only runs on an empty game and fails whole on a missing pie
 
   // A lookup that hands back an adventure whose handout is gone: nothing is added.
   const before = s.service.listGames().length;
-  const adv = { ...content.adventure('builtin:fixture-quest'), handouts: ['builtin:missing'] };
+  const adv = { ...content.adventure('builtin:fixture-quest'), handouts: [{ id: 'builtin:missing' }] };
   s.service.adventures = { get: (id) => (id === 'broken' ? adv : null) };
   const g = s.service.createGame('Fresh');
   assert.match(s.service.dispatch(g.id, DM, { type: 'adventure.load', adventureId: 'broken' }).error, /needs the handout "builtin:missing"/);
@@ -115,4 +116,79 @@ test('the shipped Training Grounds adventure loads and runs', () => {
   assert.equal(placed.length, 7, 'every starter creature exists and is on its map');
   service.close();
   real.close();
+});
+
+test('adventure handouts can be tied to scenes by key', () => {
+  const s = setup();
+  const st = s.service.get(s.service.createGame('', { adventureId: 'builtin:fixture-quest' }).id).state;
+  const [cave] = st.sceneOrder;
+  const [letter, map] = st.handoutOrder.map((id) => st.handouts[id]);
+  assert.deepEqual(letter.sceneIds, [cave]);
+  assert.equal('sceneIds' in map, false);
+  const scenes = [{ key: 'a', template: 't' }];
+  assert.deepEqual(validateAdventure({ name: 'x', scenes, handouts: ['h1', { id: 'h2', scenes: ['a'] }, 'h1'] }).handouts,
+    [{ id: 'h1' }, { id: 'h2', scenes: ['a'] }]);
+  assert.throws(() => validateAdventure({ name: 'x', scenes, handouts: [{ id: 'h', scenes: ['b'] }] }), /"b", which isn't one of the scene keys/);
+  assert.throws(() => validateAdventure({ name: 'x', scenes, handouts: [{ scenes: ['a'] }] }), /handouts\[0\]/);
+});
+
+test('scene templates can start an NPC hostile or a creature dead', () => {
+  const s = setup();
+  const t = s.templates.create({
+    name: 'Ambush', grid: { cols: 8, rows: 8 },
+    entities: [
+      { kind: 'npc', defId: 'town-guard', x: 1, y: 1, hostile: true },
+      { kind: 'monster', defId: 'rat', x: 2, y: 2, dead: true },
+      { kind: 'monster', defId: 'rat', x: 3, y: 3, hostile: 'yes', dead: 'no' },
+    ],
+  });
+  assert.deepEqual(t.data.entities.map(({ id, ...e }) => e), [
+    { kind: 'npc', defId: 'town-guard', x: 1, y: 1, hostile: true },
+    { kind: 'monster', defId: 'rat', x: 2, y: 2, dead: true },
+    { kind: 'monster', defId: 'rat', x: 3, y: 3 },
+  ]);
+  const sid = ok(s.run(DM, { type: 'scene.add', templateId: t.id })).sceneId;
+  const here = Object.values(s.state().entities).filter((e) => e.sceneId === sid);
+  assert.equal(here.find((e) => e.defId === 'town-guard').hostile, true);
+  assert.deepEqual(here.filter((e) => e.defId === 'rat').map((e) => e.status).sort(), ['active', 'dead']);
+});
+
+test('every shipped adventure loads into a game', () => {
+  const real = loadContent(join(ROOT, 'data'));
+  const db = openDb(':memory:');
+  const service = new GameService({
+    db, content: real, templates: new TemplateStore(db, { builtins: real }), handouts: new HandoutStore(db, { builtins: real }),
+    adventures: { get: (id) => real.adventure(id) }, settings: fixedSettings(), now: () => 1_000_000,
+  });
+  assert.ok(real.adventures().length >= 2);
+  for (const adv of real.adventures()) {
+    const st = service.get(service.createGame('', { adventureId: adv.id }).id).state;
+    assert.equal(st.sceneOrder.length, adv.scenes.length, adv.id);
+    assert.equal(st.handoutOrder.length, adv.handouts.length, adv.id);
+  }
+  service.close();
+  real.close();
+});
+
+test('the DM can read an adventure\'s handouts before creating a game', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'one-and-done-adv-api-'));
+  cpSync(FIXTURE_DATA, dir, { recursive: true });
+  const server = createServer({ dbFile: ':memory:', password: 'pw', contentDir: dir });
+  await new Promise((r) => server.httpServer.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.httpServer.address().port}`;
+  try {
+    const url = `${base}/api/adventures/${encodeURIComponent('builtin:fixture-quest')}/handouts`;
+    assert.equal((await fetch(url)).status, 401);
+    const login = await fetch(`${base}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"password":"pw"}' });
+    const cookie = login.headers.get('set-cookie').split(';')[0];
+    const list = await (await fetch(url, { headers: { cookie } })).json();
+    assert.deepEqual(list, [
+      { id: 'builtin:fixture-letter', title: 'Fixture Letter', text: 'Meet me at **midnight**.', image: null, dmNotes: "It's a trap.", scenes: ['Fixture Cave'] },
+      { id: 'builtin:fixture-map', title: 'Fixture Map', text: null, image: '/static/handouts/map.webp', dmNotes: null, scenes: [] },
+    ]);
+    assert.equal((await fetch(`${base}/api/adventures/nope/handouts`, { headers: { cookie } })).status, 404);
+  } finally {
+    await server.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

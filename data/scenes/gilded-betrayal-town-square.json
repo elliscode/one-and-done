@@ -1,0 +1,36 @@
+{
+  "name": "The Town Square",
+  "background": "/static/backgrounds/tgb-courtyard-battle-encounter.webp",
+  "bgScale": 1,
+  "grid": {
+    "cols": 27,
+    "rows": 19,
+    "cellSize": 56,
+    "offsetX": 0,
+    "offsetY": 0,
+    "color": "#ffffff",
+    "opacity": 0.25
+  },
+  "spawn": {
+    "x": 12,
+    "y": 18
+  },
+  "entities": [
+    { "kind": "npc", "defId": "town-guard", "x": 8, "y": 14, "hostile": true },
+    { "kind": "npc", "defId": "vagrant", "x": 7, "y": 15 },
+    { "kind": "npc", "defId": "merchant", "x": 2, "y": 8 },
+    { "kind": "npc", "defId": "innkeeper", "x": 25, "y": 13 },
+    { "kind": "npc", "defId": "armorer", "x": 25, "y": 8 },
+    { "kind": "npc", "defId": "visored-guard", "x": 2, "y": 14, "hostile": true },
+    { "kind": "npc", "defId": "visored-guard", "x": 24, "y": 14, "hostile": true },
+    { "kind": "npc", "defId": "bearded-guard", "x": 1, "y": 13, "hostile": true },
+    { "kind": "npc", "defId": "town-guard", "x": 26, "y": 14, "hostile": true },
+    { "kind": "npc", "defId": "bearded-guard", "x": 6, "y": 5, "hostile": true },
+    { "kind": "npc", "defId": "visored-guard", "x": 9, "y": 5, "hostile": true },
+    { "kind": "npc", "defId": "town-guard", "x": 18, "y": 5, "hostile": true },
+    { "kind": "npc", "defId": "bearded-guard", "x": 20, "y": 5, "hostile": true },
+    { "kind": "npc", "defId": "judge-octavian-rook", "x": 21, "y": 4, "name": "Judge Octavian Rook", "hostile": true },
+    { "kind": "npc", "defId": "town-guard", "x": 10, "y": 1, "hostile": true },
+    { "kind": "npc", "defId": "town-guard", "x": 8, "y": 4, "hostile": true }
+  ]
+}

@@ -99,10 +99,12 @@ export function projectForPlayer(state, playerId, presence) {
     options: { playersCanLeave: !!state.options?.playersCanLeave },
     combat: structuredClone(state.combat),
     turn: me?.entityId ? structuredClone(state.turn[me.entityId] ?? null) : null,
-    scene: scene ? structuredClone(scene) : null,
-    // Only handouts the DM has revealed, without DM notes or where they came from.
+    // Without the DM's branching links (next), so players can't see where the party might go.
+    scene: scene ? (({ next, ...pub }) => structuredClone(pub))(scene) : null,
+    // Only handouts the DM has revealed, without DM notes or where they came from. forScene: tied
+    // to the active scene (the other scene ids stay private, like scene links).
     handouts: (state.handoutOrder ?? []).map((id) => state.handouts[id]).filter((ho) => ho?.revealed)
-      .map(({ id, title, text, image }) => ({ id, title, text, image })),
+      .map(({ id, title, text, image, sceneIds }) => ({ id, title, text, image, forScene: !!(sceneId && sceneIds?.includes(sceneId)) })),
     entities: scene ? entitiesInScene(state, sceneId).map((e) => entityView(e, sceneId, playerId, state)) : [],
   };
 }

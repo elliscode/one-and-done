@@ -170,6 +170,16 @@ export function createServer({
   app.get('/api/adventures', requireDm, handle(() => content.adventures()
     .map(({ id, name, description, scenes, handouts: hs }) => ({ id, name, description, scenes: scenes.length, handouts: hs.length }))
     .sort((a, b) => a.name.localeCompare(b.name))));
+  // An adventure's handouts in full (DM notes included), for reading before creating a game.
+  app.get('/api/adventures/:id/handouts', requireDm, (req, res) => {
+    const adv = content.adventure(req.params.id);
+    if (!adv) return res.status(404).json({ error: 'Adventure not found' });
+    const sceneName = Object.fromEntries(adv.scenes.map((s) => [s.key, s.name ?? content.scene(s.template)?.name ?? s.key]));
+    res.json(adv.handouts.map(({ id, scenes = [] }) => {
+      const ho = content.handout(id);
+      return { id, title: ho.title, ...ho.data, scenes: scenes.map((k) => sceneName[k]) };
+    }));
+  });
 
   // ---- games ----
   app.get('/api/games', requireDm, handle(() => service.listGames()));

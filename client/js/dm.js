@@ -287,25 +287,66 @@ async function loadLibrary() {
 // ---------- handouts ----------
 
 const gameHandouts = () => state.handoutOrder.map((id) => state.handouts[id]).filter(Boolean);
+const tiedToActive = (ho) => !!state.activeSceneId && !!ho.sceneIds?.includes(state.activeSceneId);
 let reader = null;
+
+// The DM's handout viewer: the active scene's handouts first, DM notes, and Reveal / Hide.
+function openHandouts(startId = null) {
+  reader = openReader(gameHandouts(), {
+    startId, showDmNotes: true,
+    forScene: tiedToActive,
+    sceneName: () => activeScene()?.name ?? null,
+    emptyText: 'No handouts in this game yet. Add some from the Handouts tab.',
+    actions: (ho) => (ho.revealed
+      ? h('button.small', { onclick: () => send({ type: 'handout.hide', handoutId: ho.id }) }, 'Hide')
+      : h('button.small.primary', { onclick: () => send({ type: 'handout.reveal', handoutId: ho.id }) }, 'Reveal to players')),
+  });
+}
+$('#handouts-top').addEventListener('click', () => openHandouts());
+
+// Checklist of the game's scenes; Save ties the handout to the ticked ones (handout.setScenes).
+function editHandoutScenes(e, ho) {
+  if (!state.sceneOrder.length) return toast('Add a scene to this game first');
+  const boxes = state.sceneOrder.map((sid) => ({ sid, box: h('input', { type: 'checkbox', checked: !!ho.sceneIds?.includes(sid) }) }));
+  popupMenu(e.clientX, e.clientY + 12, 'Show with scenes', [
+    { heading: `"${ho.title}" is grouped under these scenes in the handout viewers` },
+    ...boxes.map(({ sid, box }) => ({ node: h('label.next-choice', {}, box, ' ', state.scenes[sid].name) })),
+    {
+      node: h('div.row.next-actions', {},
+        h('button.small', { onclick: () => closeMenu() }, 'Cancel'),
+        h('button.small.primary', {
+          onclick: () => {
+            closeMenu();
+            send({ type: 'handout.setScenes', handoutId: ho.id, sceneIds: boxes.filter((b) => b.box.checked).map((b) => b.sid) });
+          },
+        }, 'Save')),
+    },
+  ]);
+}
 
 function renderHandouts() {
   const list = gameHandouts();
   if (reader?.open) reader.refresh(list);
   const pick = h('select.grow', {}, ...library.map((ho) => h('option', { value: ho.id }, `${ho.title}${ho.builtIn ? ' (built-in)' : ''}`)));
+  const row = (ho) => h(`div.scene-item.handout-item${ho.revealed ? '.active' : ''}`, {},
+    h('span.name', { title: ho.revealed ? 'Players can read this' : 'Hidden from players' }, `${ho.revealed ? '👁 ' : ''}${ho.title}`),
+    ho.revealed
+      ? h('button.small', { title: 'Hide from players', onclick: () => send({ type: 'handout.hide', handoutId: ho.id }) }, 'Hide')
+      : h('button.small.primary', { title: 'Show to every player', onclick: () => send({ type: 'handout.reveal', handoutId: ho.id }) }, 'Reveal'),
+    h('button.small', { title: 'Read it as players see it, plus your DM notes', onclick: () => openHandouts(ho.id) }, '👁'),
+    h('button.small', { title: 'Show with scenes…', onclick: (e) => editHandoutScenes(e, ho) }, '📍'),
+    h('button.small', { title: 'Edit this game\'s copy', onclick: () => editHandout(ho) }, '✎'),
+    h('button.small.danger', {
+      title: 'Remove from game',
+      onclick: () => confirm(`Remove "${ho.title}" from this game? The library copy is kept.`) && send({ type: 'handout.remove', handoutId: ho.id }),
+    }, '✕'),
+    ho.sceneIds?.length ? h('div.handout-scenes', {}, `📍 ${ho.sceneIds.map((sid) => state.scenes[sid]?.name ?? '?').join(', ')}`) : null);
+  const here = list.filter(tiedToActive);
+  const rest = list.filter((ho) => !tiedToActive(ho));
   fill($('#tab-handouts'),
-    h('div.section-title', {}, 'Handouts in this game'),
-    ...(list.length ? list.map((ho) => h(`div.scene-item.handout-item${ho.revealed ? '.active' : ''}`, {},
-      h('span.name', { title: ho.revealed ? 'Players can read this' : 'Hidden from players' }, `${ho.revealed ? '👁 ' : ''}${ho.title}`),
-      ho.revealed
-        ? h('button.small', { title: 'Hide from players', onclick: () => send({ type: 'handout.hide', handoutId: ho.id }) }, 'Hide')
-        : h('button.small.primary', { title: 'Show to every player', onclick: () => send({ type: 'handout.reveal', handoutId: ho.id }) }, 'Reveal'),
-      h('button.small', { title: 'Read it as players see it', onclick: () => { reader = openReader(gameHandouts(), { startId: ho.id }); } }, '👁'),
-      h('button.small', { title: 'Edit this game\'s copy', onclick: () => editHandout(ho) }, '✎'),
-      h('button.small.danger', {
-        title: 'Remove from game',
-        onclick: () => confirm(`Remove "${ho.title}" from this game? The library copy is kept.`) && send({ type: 'handout.remove', handoutId: ho.id }),
-      }, '✕'))) : [h('p.muted', {}, 'No handouts yet.')]),
+    ...(here.length ? [h('div.section-title', {}, `📍 ${activeScene().name}`), ...here.map(row)] : []),
+    h('div.section-title', {}, here.length ? 'Other handouts' : 'Handouts in this game'),
+    ...(rest.length ? rest.map(row) : [h('p.muted', {}, list.length ? 'None.' : 'No handouts yet.')]),
     h('div.section-title', {}, 'Add from library'),
     library.length
       ? h('div.row', {}, pick, h('button.primary.small', { onclick: () => send({ type: 'handout.add', handoutId: pick.value }) }, 'Add'))
@@ -336,9 +377,12 @@ async function editHandout(ho) {
     }, image ? 'Change' : 'Pick image'),
     image ? h('button.small', { onclick: () => { image = null; drawCover(); } }, 'Remove') : null);
   drawCover();
+  // A new quick note is tied to the scene you're in by default.
+  const tie = !ho && activeScene() ? h('input', { type: 'checkbox', checked: true }) : null;
   const close = () => backdrop.remove();
   const save = async () => {
     const fields = { title: title.value, text: text.value, image, dmNotes: notes.value };
+    if (tie) fields.sceneIds = tie.checked ? [state.activeSceneId] : [];
     const r = await send(ho ? { type: 'handout.update', handoutId: ho.id, ...fields } : { type: 'handout.create', ...fields });
     if (r) close();
   };
@@ -346,40 +390,95 @@ async function editHandout(ho) {
     h('div.modal-title', {}, ho ? 'Edit handout' : 'Quick note'),
     title, h('div.section-title', {}, 'Cover image'), cover, h('div.section-title', {}, 'Text'), text,
     h('div.section-title', {}, 'DM notes (never shown to players)'), notes,
+    tie ? h('label.next-choice', {}, tie, ` Show with ${activeScene().name}`) : null,
     h('div.modal-actions', {}, h('button.small', { onclick: close }, 'Cancel'), h('button.small.primary', { onclick: save }, 'Save')));
   const backdrop = h('div.modal-backdrop', { onclick: (e) => { if (e.target === backdrop) close(); } }, card);
   document.body.append(backdrop);
   title.focus();
 }
 
+// Scenes: with an active scene that has branching links, the list is grouped as Current / Next /
+// Other scenes so the likely next stops stand out. Links are a visual aid only: every scene can
+// still be activated.
 function renderScenes() {
   const root = $('#tab-scenes');
   const pick = h('select.grow', {}, ...templates.map((t) => h('option', { value: t.id }, t.name)));
-  fill(root, 
-    h('div.section-title', {}, 'Scenes in this game'),
-    ...(state.sceneOrder.length ? state.sceneOrder.map((sid) => {
-      const s = state.scenes[sid];
-      const active = sid === state.activeSceneId;
-      const count = Object.values(state.entities).filter((e) => e.scope === 'scene' && e.sceneId === sid).length;
-      return h(`div.scene-item${active ? '.active' : ''}`, {},
-        h('span.name', { title: s.name }, `${active ? '▶ ' : ''}${s.name}`),
-        h('span.muted', { title: 'Scene-scoped creatures' }, `${count}🐾`),
-        active ? null : h('button.small.primary', { onclick: () => send({ type: 'scene.activate', sceneId: sid }) }, 'Go'),
-        h('button.small', {
-          title: 'Rename', onclick: () => { const n = prompt('Scene name', s.name); if (n) send({ type: 'scene.rename', sceneId: sid, name: n }); },
-        }, '✎'),
-        h('button.small.danger', {
-          title: 'Remove from game',
-          onclick: () => confirm(`Remove "${s.name}" from this game? Its scene-scoped creatures go with it. The template is kept.`) && send({ type: 'scene.remove', sceneId: sid }),
-        }, '✕'));
-    }) : [h('p.muted', {}, 'No scenes yet.')]),
-    state.activeSceneId ? h('button.small', { onclick: () => send({ type: 'scene.activate', sceneId: null }) }, 'Clear active scene') : null,
+  const nameOf = (id) => state.scenes[id]?.name ?? '?';
+  const activeId = state.activeSceneId;
+  const nextIds = (activeId && state.scenes[activeId]?.next) || [];
+  const cameFrom = activeId ? state.sceneOrder.filter((sid) => state.scenes[sid].next?.includes(activeId)) : [];
+
+  const row = (sid, kind = '') => {
+    const s = state.scenes[sid];
+    const active = sid === activeId;
+    const count = Object.values(state.entities).filter((e) => e.scope === 'scene' && e.sceneId === sid).length;
+    const links = [
+      s.next?.length ? `→ ${s.next.map(nameOf).join(', ')}` : null,
+      active && cameFrom.length ? `← from ${cameFrom.map(nameOf).join(', ')}` : null,
+    ].filter(Boolean);
+    return h(`div.scene-item${active ? '.active' : ''}${kind ? `.${kind}` : ''}`, {},
+      h('span.name', { title: s.name }, `${active ? '▶ ' : ''}${s.name}`),
+      h('span.muted', { title: 'Scene-scoped creatures' }, `${count}🐾`),
+      active ? null : h('button.small.primary', { onclick: () => send({ type: 'scene.activate', sceneId: sid }) }, kind === 'next' ? 'Go →' : 'Go'),
+      h('button.small', { title: 'Next scenes… (which scenes this one leads to)', onclick: (e) => editNext(e, sid) }, '⇢'),
+      h('button.small', {
+        title: 'Rename', onclick: () => { const n = prompt('Scene name', s.name); if (n) send({ type: 'scene.rename', sceneId: sid, name: n }); },
+      }, '✎'),
+      h('button.small.danger', {
+        title: 'Remove from game',
+        onclick: () => confirm(`Remove "${s.name}" from this game? Its scene-scoped creatures go with it. The template is kept.`) && send({ type: 'scene.remove', sceneId: sid }),
+      }, '✕'),
+      links.length ? h('div.scene-links', {}, ...links.map((l) => h('div', {}, l))) : null);
+  };
+
+  let list;
+  if (!state.sceneOrder.length) {
+    list = [h('div.section-title', {}, 'Scenes in this game'), h('p.muted', {}, 'No scenes yet.')];
+  } else if (nextIds.length) {
+    const others = state.sceneOrder.filter((sid) => sid !== activeId && !nextIds.includes(sid));
+    list = [
+      h('div.section-title', {}, 'Current'), row(activeId),
+      h('div.section-title', {}, 'Next'), ...nextIds.map((sid) => row(sid, 'next')),
+      ...(others.length ? [h('div.section-title', {}, 'Other scenes'), ...others.map((sid) => row(sid, 'dim'))] : []),
+    ];
+  } else {
+    list = [h('div.section-title', {}, 'Scenes in this game'), ...state.sceneOrder.map((sid) => row(sid))];
+  }
+
+  fill(root,
+    ...list,
+    activeId ? h('button.small', { onclick: () => send({ type: 'scene.activate', sceneId: null }) }, 'Clear active scene') : null,
     h('div.section-title', {}, 'Add from library'),
     templates.length
       ? h('div.row', {}, pick, h('button.primary.small', { onclick: () => send({ type: 'scene.add', templateId: pick.value }) }, 'Add'))
       : h('p.muted', {}, 'Your scene library is empty. ', h('a', { href: '/#scenes' }, 'Build a scene'), ' first.'),
-    h('p.muted', { style: { fontSize: '12px' } }, 'Each added scene is an independent live copy. Map layout is edited in Scenes, not here.'),
+    h('p.muted', { style: { fontSize: '12px' } }, 'Each added scene is an independent live copy. Map layout is edited in Scenes, not here. Use ⇢ to mark which scenes come next; they stand out while that scene is active.'),
   );
+}
+
+// Checklist of the game's other scenes; Save replaces this scene's links (scene.setNext).
+// Already-linked scenes keep their order; newly ticked ones are added after them.
+function editNext(e, sid) {
+  const s = state.scenes[sid];
+  const current = s.next ?? [];
+  const others = [...current, ...state.sceneOrder.filter((id) => id !== sid && !current.includes(id))];
+  if (!others.length) return toast('Add another scene to this game first');
+  const boxes = others.map((id) => ({ id, box: h('input', { type: 'checkbox', checked: current.includes(id) }) }));
+  const items = [
+    { heading: `After "${s.name}" the party may go to…` },
+    ...boxes.map(({ id, box }) => ({ node: h('label.next-choice', {}, box, ' ', state.scenes[id].name) })),
+    {
+      node: h('div.row.next-actions', {},
+        h('button.small', { onclick: () => closeMenu() }, 'Cancel'),
+        h('button.small.primary', {
+          onclick: () => {
+            closeMenu();
+            send({ type: 'scene.setNext', sceneId: sid, next: boxes.filter((b) => b.box.checked).map((b) => b.id) });
+          },
+        }, 'Save')),
+    },
+  ];
+  popupMenu(e.clientX, e.clientY + 12, 'Next scenes', items);
 }
 
 function renderPlayers() {
@@ -618,7 +717,7 @@ function render() {
   renderTop();
   memo('scenes', [state.scenes, state.sceneOrder, state.activeSceneId, templates, ents.map((e) => [e.scope, e.sceneId])], renderScenes);
   memo('players', [state.players, state.options], renderPlayers);
-  memo('handouts', [state.handouts, state.handoutOrder, library], renderHandouts);
+  memo('handouts', [state.handouts, state.handoutOrder, library, state.activeSceneId, state.sceneOrder.map((sid) => state.scenes[sid].name)], renderHandouts);
   memo('banks', [spawnScope, state.activeSceneId, state.combat, state.turn, ents.filter((e) => e.kind !== 'pc').map((e) => [e.id, e.name, e.hp, e.status, e.scope, e.sceneId, e.damageTaken])], renderBanks);
   renderBoard();
   const sel = selected();

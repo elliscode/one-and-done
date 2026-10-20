@@ -27,6 +27,10 @@ export function normalizeTemplate(input = {}) {
       id: typeof e.id === 'string' ? e.id.slice(0, 20) : newId('t'),
       kind: e.kind, defId: e.defId, x: e.x, y: e.y,
       ...(e.name ? { name: String(e.name).slice(0, 40) } : {}),
+      // Optional starting state (hand-written built-in scenes): an NPC that starts hostile, or a
+      // creature that starts dead (e.g. a body to investigate).
+      ...(e.kind === 'npc' && e.hostile === true ? { hostile: true } : {}),
+      ...(e.dead === true ? { dead: true } : {}),
     }));
   const spawn = input.spawn && inGrid(input.spawn) ? { x: input.spawn.x, y: input.spawn.y } : null;
   return { name, data: { background, bgScale, grid, entities, spawn } };

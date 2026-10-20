@@ -2,9 +2,12 @@
   "name": "Training Grounds",
   "description": "A short tutorial one-shot: learn the controls on the dummies, then clear bandits from the courtyard. About 30–45 minutes.",
   "scenes": [
-    { "key": "yard", "template": "builtin:training-yard" },
+    { "key": "yard", "template": "builtin:training-yard", "next": ["courtyard"] },
     { "key": "courtyard", "template": "builtin:courtyard-ambush" }
   ],
-  "handouts": ["builtin:welcome-to-one-and-done", "builtin:notice-board-bounty"],
+  "handouts": [
+    { "id": "builtin:welcome-to-one-and-done", "scenes": ["yard"] },
+    { "id": "builtin:notice-board-bounty", "scenes": ["yard", "courtyard"] }
+  ],
   "startScene": "yard"
 }

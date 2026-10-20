@@ -1,9 +1,9 @@
 import { isValidDice } from './dice.js';
 import {
-  PLAYER_COLORS, fail, newId, randomToken, entityFromDef, entitiesInScene, isFriendly, makeItem, turnFor, areEnemies,
+  PLAYER_COLORS, MAX_SCENE_LINKS, fail, newId, randomToken, entityFromDef, entitiesInScene, isFriendly, makeItem, turnFor, areEnemies,
 } from './state.js';
 import { inBounds, ensurePlaced } from './placement.js';
-import { normalizeHandout, MAX_HANDOUTS } from './handouts.js';
+import { normalizeHandout, MAX_HANDOUTS, MAX_HANDOUT_SCENES } from './handouts.js';
 import { startCombat, advancePhase, endCombat, applyHeal, applyDamage, setHp, revive, kill, dealDamage, deathAt } from './combat.js';
 import { addEffect, clearStatus, removeEffect, effectsOf, movementAllowance } from './status.js';
 import { activateAbility, runAbility, strike, checkTaunt, resolveCheck, onPhaseTransition, STATUSES } from './effects.js';
@@ -174,6 +174,8 @@ function addSceneFromTemplate(ctx, tpl, name = null) {
       scope: 'scene', sceneId: id, z: ++ctx.state.zCounter, name: placement.name || numberedName(ctx, d, placement.kind),
     });
     if (inBounds(scene, placement.x, placement.y, e.size)) e.positions[id] = { x: placement.x, y: placement.y };
+    if (placement.hostile && e.kind === 'npc') e.hostile = true;
+    if (placement.dead && !e.immortal && e.kind !== 'object') kill(e);
     ctx.state.entities[e.id] = e;
   }
   ensurePlaced(ctx.state, id);
@@ -201,8 +203,32 @@ def('scene.remove', { who: 'dm', clearsUndo: true }, (ctx) => {
   }
   delete ctx.state.scenes[scene.id];
   ctx.state.sceneOrder = ctx.state.sceneOrder.filter((s) => s !== scene.id);
+  for (const other of Object.values(ctx.state.scenes)) {
+    if (!other.next) continue;
+    other.next = other.next.filter((id) => id !== scene.id);
+    if (!other.next.length) delete other.next;
+  }
+  for (const ho of Object.values(ctx.state.handouts)) {
+    if (!ho.sceneIds) continue;
+    ho.sceneIds = ho.sceneIds.filter((id) => id !== scene.id);
+    if (!ho.sceneIds.length) delete ho.sceneIds;
+  }
   if (ctx.state.activeSceneId === scene.id) ctx.state.activeSceneId = null;
   ctx.log('scene', `DM removed scene "${scene.name}"`, { dmOnly: true });
+});
+
+// Branching: which scenes come next after this one. A DM-only visual aid; links never restrict
+// which scene can be activated. Directed, at most MAX_SCENE_LINKS, in the order given.
+
+def('scene.setNext', { who: 'dm' }, (ctx) => {
+  const scene = ctx.state.scenes[ctx.cmd.sceneId];
+  if (!scene) fail('Unknown scene');
+  if (!Array.isArray(ctx.cmd.next)) fail('next must be a list of scene ids');
+  const next = [...new Set(ctx.cmd.next.map(String))].filter((id) => id !== scene.id);
+  for (const id of next) if (!ctx.state.scenes[id]) fail('Unknown scene');
+  if (next.length > MAX_SCENE_LINKS) fail(`A scene can link to at most ${MAX_SCENE_LINKS} next scenes`);
+  if (next.length) scene.next = next;
+  else delete scene.next;
 });
 
 def('scene.rename', { who: 'dm' }, (ctx) => {
@@ -241,6 +267,18 @@ function addHandout(ctx, { title, data }, sourceId = null) {
   return ctx.state.handouts[id];
 }
 
+// Ties a game handout to some of the game's scenes, so the handout viewers group it under "This
+// scene" while one of them is active. An empty list unties it. A grouping aid only: it doesn't
+// reveal or hide anything.
+function setHandoutScenes(ctx, ho, sceneIds) {
+  if (!Array.isArray(sceneIds)) fail('sceneIds must be a list of scene ids');
+  const ids = [...new Set(sceneIds.map(String))];
+  for (const id of ids) if (!ctx.state.scenes[id]) fail('Unknown scene');
+  if (ids.length > MAX_HANDOUT_SCENES) fail(`A handout can be tied to at most ${MAX_HANDOUT_SCENES} scenes`);
+  if (ids.length) ho.sceneIds = ids;
+  else delete ho.sceneIds;
+}
+
 function libraryHandout(ctx, id) {
   const ho = ctx.handouts?.get(id);
   if (!ho) fail('Unknown handout');
@@ -256,6 +294,7 @@ def('handout.add', { who: 'dm' }, (ctx) => {
 
 def('handout.create', { who: 'dm' }, (ctx) => {
   const ho = addHandout(ctx, normalizeHandout(ctx.cmd));
+  if (ctx.cmd.sceneIds !== undefined) setHandoutScenes(ctx, ho, ctx.cmd.sceneIds);
   ctx.log('handout', '', { dmText: `DM wrote handout "${ho.title}"`, dmOnly: true });
   return { handoutId: ho.id };
 });
@@ -266,6 +305,10 @@ def('handout.update', { who: 'dm' }, (ctx) => {
   const pick = (k) => (ctx.cmd[k] !== undefined ? ctx.cmd[k] : ho[k]);
   const { title, data } = normalizeHandout({ title: pick('title'), text: pick('text'), image: pick('image'), dmNotes: pick('dmNotes') });
   Object.assign(ho, { title }, data);
+});
+
+def('handout.setScenes', { who: 'dm' }, (ctx) => {
+  setHandoutScenes(ctx, getHandout(ctx, ctx.cmd.handoutId), ctx.cmd.sceneIds);
 });
 
 def('handout.reveal', { who: 'dm' }, (ctx) => {
@@ -302,14 +345,20 @@ def('adventure.load', { who: 'dm', clearsUndo: true }, (ctx) => {
     if (!tpl) fail(`This adventure needs the scene "${s.template}", which doesn't exist`);
     return { ...s, tpl };
   });
-  const handouts = adv.handouts.map((id) => {
-    const ho = ctx.handouts?.get(id);
-    if (!ho) fail(`This adventure needs the handout "${id}", which doesn't exist`);
-    return ho;
+  const handouts = adv.handouts.map((entry) => {
+    const ho = ctx.handouts?.get(entry.id);
+    if (!ho) fail(`This adventure needs the handout "${entry.id}", which doesn't exist`);
+    return { ho, scenes: entry.scenes ?? [] };
   });
   const ids = {};
   for (const s of scenes) ids[s.key] = addSceneFromTemplate(ctx, s.tpl, s.name ?? null).id;
-  for (const ho of handouts) addHandout(ctx, normalizeHandout({ title: ho.title, ...ho.data }), ho.id);
+  for (const s of scenes) {
+    if (s.next?.length) ctx.state.scenes[ids[s.key]].next = s.next.map((key) => ids[key]);
+  }
+  for (const { ho, scenes: keys } of handouts) {
+    const copy = addHandout(ctx, normalizeHandout({ title: ho.title, ...ho.data }), ho.id);
+    if (keys.length) copy.sceneIds = keys.map((k) => ids[k]);
+  }
   const start = adv.startScene ? ids[adv.startScene] : ids[scenes[0].key];
   ctx.state.activeSceneId = start;
   ensurePlaced(ctx.state, start);

@@ -1,0 +1,27 @@
+{
+  "name": "Inside the Vault",
+  "background": "/static/backgrounds/tgb-inside-cave-treasure.webp",
+  "bgScale": 1,
+  "grid": {
+    "cols": 25,
+    "rows": 17,
+    "cellSize": 62,
+    "offsetX": 0,
+    "offsetY": 0,
+    "color": "#ffffff",
+    "opacity": 0.25
+  },
+  "spawn": {
+    "x": 12,
+    "y": 16
+  },
+  "entities": [
+    { "kind": "monster", "defId": "black-dragon", "x": 11, "y": 7 },
+    { "kind": "monster", "defId": "keening-wraith", "x": 8, "y": 8 },
+    { "kind": "monster", "defId": "keening-wraith", "x": 9, "y": 6 },
+    { "kind": "monster", "defId": "keening-wraith", "x": 11, "y": 5 },
+    { "kind": "monster", "defId": "keening-wraith", "x": 13, "y": 5 },
+    { "kind": "monster", "defId": "keening-wraith", "x": 15, "y": 6 },
+    { "kind": "monster", "defId": "keening-wraith", "x": 16, "y": 8 }
+  ]
+}

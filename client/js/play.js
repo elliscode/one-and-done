@@ -87,7 +87,10 @@ function markRead(id) {
 }
 
 function openHandouts(startId = null) {
-  reader = openReader(state?.handouts ?? [], { startId, onRead: markRead, emptyText: 'The DM hasn\'t shared anything yet.' });
+  reader = openReader(state?.handouts ?? [], {
+    startId, onRead: markRead, emptyText: 'The DM hasn\'t shared anything yet.',
+    forScene: (ho) => ho.forScene, sceneName: () => state?.scene?.name ?? null,
+  });
 }
 
 function updateHandoutsButton() {

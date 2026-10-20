@@ -1,0 +1,23 @@
+{
+  "name": "Inside the Prison",
+  "background": "/static/backgrounds/tgb-inside-prison.webp",
+  "bgScale": 1,
+  "grid": {
+    "cols": 23,
+    "rows": 16,
+    "cellSize": 64,
+    "offsetX": 0,
+    "offsetY": 0,
+    "color": "#ffffff",
+    "opacity": 0.25
+  },
+  "spawn": {
+    "x": 16,
+    "y": 2
+  },
+  "entities": [
+    { "kind": "npc", "defId": "lucien-voss", "x": 22, "y": 12, "name": "Lucien Voss" },
+    { "kind": "npc", "defId": "town-guard", "x": 6, "y": 11 },
+    { "kind": "npc", "defId": "town-guard", "x": 8, "y": 12 }
+  ]
+}

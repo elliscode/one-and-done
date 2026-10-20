@@ -1,0 +1,5 @@
+{
+  "title": "The Town Square",
+  "text": "You've made it to the Town Square, however guards are on high alert looking for escaped prisoners.\n\nEither sneak your way or fight your way to the Tram which takes you to the docks!",
+  "dmNotes": "# Who's in this scene\n\n- Town guards and Judge Octavian Rook - If any of them see the party, they will immediately attack. \n- Merchant - will sell the party disguises to board the tram without being seen\n- Armorer - will sell the party guard armor to board the tram without being seen\n\n# What you need to do\n\nTell the party they can sneak to either of the merchants. Have the party roll Sneak checks and decide \n\n- Option 1: Party rolls average above a 10, they succeed\n- Option 2: Anyone in the party rolls below a 10, they fail \n\nUpon failing to sneak, combat ensues with all guards"
+}

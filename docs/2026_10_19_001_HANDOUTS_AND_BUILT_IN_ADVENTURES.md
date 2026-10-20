@@ -65,7 +65,7 @@ Undo doesn't touch handouts, since `applyUndo` restores tokens, turns and checks
 - **Player:**
   - A **📜 Handouts** button appears in the top bar once something is shared, showing "(N new)" while there's anything unread.
   - Newly shared handouts pop a toast with **Read**.
-  - The reader lists the shared handouts and renders each one. Clicking an image opens a full-size lightbox.
+  - The reader lists the shared handouts and renders each one. Clicking an image opens it in a new tab, so text-heavy images can be zoomed and scrolled with the browser's own controls.
   - Read/unread is a per-browser localStorage convenience, not game state.
 - **Assets page:** a new **📜 Handouts** folder (`static/handouts`).
 
@@ -75,6 +75,21 @@ A small renderer we wrote, because the client has no build step. It's pure, so t
 - **Safety:** it escapes everything first, then applies Markdown, so raw HTML is never rendered.
 - **Links:** http and https only, opening in a new tab.
 - **Images:** `/static/` paths only.
+
+### 6. Tying handouts to scenes (added 2026-10-20)
+
+A game handout can be tied to some of the game's scenes (`sceneIds`, at most `MAX_HANDOUT_SCENES` = 30). It's a grouping aid: tying never reveals or hides anything.
+
+- **Setting ties:**
+  - `handout.setScenes { handoutId, sceneIds }` (DM) replaces the ties. Unknown ids are rejected, duplicates are removed, and an empty list unties the handout.
+  - `handout.create` also accepts `sceneIds`. The DM's **+ Quick note** ties to the active scene by default.
+  - `scene.remove` unties the removed scene.
+- **Players:** `projectForPlayer` sends each revealed handout with `forScene: true/false` (tied to the active scene or not), never the scene ids themselves.
+- **Viewers:**
+  - The DM top bar has a **📜 Handouts** button. The DM's viewer and the player's 📜 reader list the active scene's handouts first, under "📍 *scene name*". The rest go under a collapsible **Other handouts** group, collapsed while the scene has handouts.
+  - The DM's viewer also shows Reveal/Hide and the DM notes.
+- **DM Handouts tab:** it's grouped the same way. Each row has a **📍** button (a checklist of the game's scenes) and a `📍 Training Yard, …` line.
+- **Adventure files:** a handout entry can be `{ "id": …, "scenes": [scene keys] }`. Training Grounds ties the welcome handout to the yard, and the bounty to the yard and the courtyard.
 
 ## Part 2: Built-in content
 

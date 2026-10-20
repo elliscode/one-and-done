@@ -108,7 +108,7 @@ export function loadContent(dir, { staticDir = null, watchFiles = false, pollMs 
     for (const adv of [...out.adventures.values()]) {
       const missing = [
         ...adv.scenes.map((s) => s.template).filter((t) => !out.scenes.has(t)),
-        ...adv.handouts.filter((h) => !out.handouts.has(h)),
+        ...adv.handouts.map((h) => h.id).filter((h) => !out.handouts.has(h)),
       ];
       if (missing.length) {
         warnings.push(`adventures/${adv.id.slice(BUILTIN_PREFIX.length)}.json: missing ${missing.join(', ')} — adventure hidden`);

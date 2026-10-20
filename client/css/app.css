@@ -361,7 +361,7 @@ details.example pre { background: var(--bg); border: 1px solid var(--line); bord
 .preview-card { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; min-height: 120px; }
 
 .handout-body { display: flex; flex-direction: column; gap: 12px; }
-.handout-cover { max-width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; cursor: zoom-in; align-self: center; }
+.handout-cover { max-width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; cursor: pointer; align-self: center; }
 .markdown { line-height: 1.55; overflow-wrap: anywhere; }
 .markdown > :first-child { margin-top: 0; }
 .markdown > :last-child { margin-bottom: 0; }
@@ -372,7 +372,7 @@ details.example pre { background: var(--bg); border: 1px solid var(--line); bord
 .markdown blockquote { border-left: 3px solid var(--gold); padding: 2px 12px; color: var(--muted); font-style: italic; }
 .markdown hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
 .markdown code { background: var(--bg3); border-radius: 4px; padding: 1px 5px; font-size: .92em; }
-.markdown img { max-width: 100%; border-radius: 6px; cursor: zoom-in; display: block; margin: 6px auto; }
+.markdown img { max-width: 100%; border-radius: 6px; cursor: pointer; display: block; margin: 6px auto; }
 
 .modal.reader { width: min(820px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
 .reader-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -388,8 +388,6 @@ details.example pre { background: var(--bg); border: 1px solid var(--line); bord
   .reader-list { width: auto; flex-direction: row; flex-wrap: wrap; }
 }
 
-.lightbox { position: fixed; inset: 0; z-index: 100002; background: #000e; display: flex; align-items: center; justify-content: center; padding: 16px; cursor: zoom-out; }
-.lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; }
 
 .modal.picker { width: min(720px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
 .picker-body { overflow: auto; }
@@ -403,3 +401,31 @@ details.example pre { background: var(--bg); border: 1px solid var(--line); bord
 .handout-item { flex-wrap: wrap; }
 .handout-item .name { cursor: default; flex-basis: 100%; white-space: normal; }
 .handouts-btn.unread { border-color: var(--gold); color: var(--gold); }
+
+/* ---------- branching scene navigator ---------- */
+.scene-item { flex-wrap: wrap; }
+/* The name gets its own line so long scene names stay readable next to the buttons. */
+.scene-item .name { flex: 1 1 100%; white-space: normal; }
+.scene-item > .muted { margin-right: auto; }
+.scene-item .scene-links { flex-basis: 100%; font-size: 11px; color: var(--muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
+.scene-item .scene-links div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scene-item.next { border-color: var(--gold); box-shadow: inset 3px 0 0 var(--gold); }
+.scene-item.dim { opacity: .6; }
+.scene-item.dim:hover, .scene-item.dim:focus-within { opacity: 1; }
+.next-choice { flex-direction: row; align-items: center; gap: 8px; padding: 5px 8px; cursor: pointer; border-radius: 6px; color: var(--text); font-size: 13px; }
+.next-choice input { margin: 0; }
+.next-choice:hover { background: var(--bg3); }
+.next-actions { justify-content: flex-end; padding: 6px 8px 2px; }
+
+.dm-notes { margin-top: 14px; border: 1px dashed var(--gold); border-radius: 8px; padding: 10px 12px; background: #3a302055; }
+.dm-notes-label { color: var(--gold); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+.reader-status { margin: -4px 0 10px; font-size: 12px; }
+
+.reader-group { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gold); margin: 6px 0 2px; text-align: left; }
+.reader-group:first-child { margin-top: 0; }
+button.reader-toggle { background: none; border: 0; padding: 4px 0; color: var(--muted); justify-content: flex-start; }
+button.reader-toggle:hover { color: var(--text); }
+.reader-hidden { color: var(--muted); font-size: 11px; }
+.reader-title-row { display: flex; align-items: flex-start; gap: 8px; }
+.reader-title-row .reader-title { margin-bottom: 6px; }
+.handout-scenes { flex-basis: 100%; font-size: 11px; color: var(--muted); }
