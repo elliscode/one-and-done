@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS scene_templates (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS handouts (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  data TEXT NOT NULL,            -- JSON { text, image, dmNotes }
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS games (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

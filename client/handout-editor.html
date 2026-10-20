@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One &amp; Done — Handout</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="page wide">
+    <div class="row">
+      <a href="/dm#handouts" class="btn small">← Handouts</a>
+      <input id="title" class="grow" placeholder="Handout title" maxlength="80">
+      <span class="muted" id="dirty"></span>
+      <button class="primary" id="save">Save handout</button>
+    </div>
+    <p class="muted hidden" id="builtin-note">This handout ships with One &amp; Done and is edited in git. <button class="small" id="duplicate">Duplicate to edit</button></p>
+    <div class="handout-editor">
+      <div class="handout-fields">
+        <div class="section-title">Cover image</div>
+        <div class="row" id="cover"></div>
+        <div class="row section-title-row">
+          <div class="section-title grow">Text (Markdown)</div>
+          <button class="small" id="insert-image" title="Insert an image into the text at the cursor">🖼 Insert image</button>
+        </div>
+        <textarea id="text" rows="16" placeholder="# A heading&#10;&#10;Some **bold** and *italic* text.&#10;&#10;- a list item&#10;&gt; a quote"></textarea>
+        <div class="muted" id="count" style="font-size:12px"></div>
+        <div class="section-title">DM notes <span class="muted">(never shown to players)</span></div>
+        <textarea id="notes" rows="4" placeholder="Secrets, reminders, when to reveal it…"></textarea>
+      </div>
+      <div class="handout-preview">
+        <div class="section-title">What players see</div>
+        <div class="preview-card" id="preview"></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/js/handout-editor.js"></script>
+</body>
+</html>

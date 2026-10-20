@@ -5,6 +5,7 @@ import { Board } from './board.js';
 import { GameFeed } from './panel.js';
 import { startAbility, abilitySummary, distance, sideOf } from './abilities.js';
 import { createPredictor, squaresBetween } from './predict.js';
+import { openReader } from './handouts.js';
 
 const token = decodeURIComponent(location.pathname.split('/').pop());
 const SEAT_KEY = `one-and-done:seat:${token}`;
@@ -46,6 +47,7 @@ socket.on('state', (s) => {
   predictor.onState();
   state = predictor.view(s);
   render();
+  updateHandouts();
 });
 socket.on('history', (hist) => panel.setHistory(hist));
 socket.on('feed', (rows) => panel.add(rows));
@@ -65,6 +67,51 @@ socket.on('contentChanged', async () => {
   render();
 });
 socket.on('connect_error', () => toast('Connection problem — retrying…', 'error'));
+
+// ---------- handouts ----------
+
+// Which shared handouts this browser has opened (a per-viewer convenience; losing it only resets
+// the unread count). Ids of handouts no longer shared are dropped, so the list stays small.
+const READ_KEY = `one-and-done:read:${token}`;
+let readIds = new Set(store.get(READ_KEY) ?? []);
+let knownHandouts = null; // ids shared at the last update, to spot newly shared ones
+let reader = null;
+
+function markRead(id) {
+  if (readIds.has(id)) return;
+  readIds.add(id);
+  const live = new Set((state?.handouts ?? []).map((ho) => ho.id));
+  readIds = new Set([...readIds].filter((x) => live.has(x)));
+  store.set(READ_KEY, [...readIds]);
+  updateHandoutsButton();
+}
+
+function openHandouts(startId = null) {
+  reader = openReader(state?.handouts ?? [], { startId, onRead: markRead, emptyText: 'The DM hasn\'t shared anything yet.' });
+}
+
+function updateHandoutsButton() {
+  const list = state?.handouts ?? [];
+  const unread = list.filter((ho) => !readIds.has(ho.id)).length;
+  const btn = $('#handouts-btn');
+  btn.classList.toggle('hidden', !list.length);
+  btn.classList.toggle('unread', unread > 0);
+  btn.textContent = unread ? `📜 Handouts (${unread} new)` : '📜 Handouts';
+}
+
+function updateHandouts() {
+  const list = state?.handouts ?? [];
+  if (knownHandouts) {
+    for (const ho of list) {
+      if (knownHandouts.has(ho.id) || readIds.has(ho.id)) continue;
+      toast(h('span', {}, `📜 The DM shared "${ho.title}" `, h('button.small', { onclick: () => openHandouts(ho.id) }, 'Read')));
+    }
+  }
+  knownHandouts = new Set(list.map((ho) => ho.id));
+  if (reader?.open) reader.refresh(list);
+  updateHandoutsButton();
+}
+$('#handouts-btn').addEventListener('click', () => openHandouts());
 
 const send = (cmd) => sendCmd(socket, cmd);
 // Sends a command, showing `apply`'s predicted result until the server answers (see predict.js).

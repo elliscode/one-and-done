@@ -1,0 +1,10 @@
+{
+  "name": "Fixture Quest",
+  "description": "Two scenes and two handouts.",
+  "scenes": [
+    { "key": "cave", "template": "builtin:fixture-cave" },
+    { "key": "hall", "template": "builtin:fixture-hall", "name": "Great Hall" }
+  ],
+  "handouts": ["builtin:fixture-letter", "builtin:fixture-map"],
+  "startScene": "hall"
+}

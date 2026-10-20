@@ -1,0 +1,5 @@
+{
+  "title": "Welcome to One & Done",
+  "text": "# Welcome, adventurer!\n\nThis is a quick tour of how to play. The DM runs the world; you play one hero.\n\n## Your hero's ring\n\n**Click your hero** to open its ring of actions:\n\n- **➜ Move**: click a highlighted square (or drag your token).\n- **⚔ Attack**: pick a weapon, then a target in range.\n- **🎒 Items**: use or give items from your pack.\n- **✋ Act**: your abilities, plus everyday actions like *Investigate*.\n\n## Combat\n\nCombat runs in **phases**: all heroes act in the *player phase*, then the monsters act in the *DM phase*. Each phase you get your **actions** and your **movement**. Watch the timer at the top of the screen.\n\n## Your settings\n\nClick your name (**⚙**) at the top right to change your name, your color, or your hero's name.\n\n> Tip: the Game Feed on the right shows every roll, so nothing is hidden behind the screen.\n\nGood luck. Try hitting a training dummy!",
+  "dmNotes": "Reveal this at the start so new players know the basics. The dummies can't die, so it's a safe place to try every ability."
+}

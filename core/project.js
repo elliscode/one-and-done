@@ -100,6 +100,9 @@ export function projectForPlayer(state, playerId, presence) {
     combat: structuredClone(state.combat),
     turn: me?.entityId ? structuredClone(state.turn[me.entityId] ?? null) : null,
     scene: scene ? structuredClone(scene) : null,
+    // Only handouts the DM has revealed, without DM notes or where they came from.
+    handouts: (state.handoutOrder ?? []).map((id) => state.handouts[id]).filter((ho) => ho?.revealed)
+      .map(({ id, title, text, image }) => ({ id, title, text, image })),
     entities: scene ? entitiesInScene(state, sceneId).map((e) => entityView(e, sceneId, playerId, state)) : [],
   };
 }

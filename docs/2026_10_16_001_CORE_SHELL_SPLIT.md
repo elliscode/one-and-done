@@ -22,7 +22,9 @@ The cloud repo depends on this one as a pinned package and imports `one-and-done
 | Combat phase timer | `nextDeadline(state)` | Wakes up at `at` and dispatches `cmd` as `{ role: 'system' }` |
 | Ping rate limit | The rule (`checkPing`) over a limiter record | Stores the record per game and player |
 | Content | Validation (`validateDefs`, `findItem`, `itemView`) | Loading, watching, editing files |
-| Scene templates | `normalizeTemplate` | Storage |
+| Scene templates | `normalizeTemplate` | Storage (the DM's own, plus built-ins from `data/scenes/`) |
+| Handouts | `normalizeHandout`, game copies in `state.handouts`, what players see | Library storage (the DM's own, plus built-ins from `data/handouts/`) |
+| Built-in adventures | `validateAdventure`, `adventure.load` | Loading `data/adventures/`; `POST /api/games { adventureId }` creates the game, then dispatches `adventure.load` (deleting the game if it fails) |
 | Settings (role strength) | Read from `deps.settings` | Storage; passes the current value on every call |
 | Auth, accounts, game listing, join-token lookup | | ✓ |
 | Presence (online / reconnecting / offline) | | ✓, passed into projections as `presenceOf(playerId)` |
@@ -42,7 +44,9 @@ The cloud repo depends on this one as a pinned package and imports `one-and-done
 | Field | Shape | Notes |
 |---|---|---|
 | `content` | `{ def(kind, id), act(id), item(inv) }` | Synchronous lookups. A cloud shell loads content before calling. |
-| `templates` | `{ get(id) }` | Synchronous. A cloud shell prefetches the template a `scene.add` command names (`cmd.templateId`). |
+| `templates` | `{ get(id) }` | Synchronous. A cloud shell prefetches the template a `scene.add` command names (`cmd.templateId`). Ids starting `builtin:` are the built-ins shipped in `data/scenes/`, the same for every account. |
+| `handouts` | `{ get(id) }` → `{ id, title, data: { text, image, dmNotes } }` | Optional; `handout.add` and `adventure.load` fail cleanly without it. A cloud shell prefetches the handout `handout.add` names (`cmd.handoutId`). `builtin:` ids come from `data/handouts/`. |
+| `adventures` | `{ get(id) }` → `validateAdventure` output plus `id` | Optional; only `adventure.load` uses it. For `adventure.load` a cloud shell prefetches the adventure (`cmd.adventureId`) and every template and handout it lists. |
 | `settings` | `{ roleStrength }` | Required. A missing or invalid value throws instead of defaulting. |
 | `rng` | `(sides) => 1..sides` | Dice. |
 | `now` | number (ms) | The time of this command. |
@@ -97,6 +101,9 @@ The browser code in `client/` is shared. Two files are per-deployment:
 - **`client/js/config.js`:** `API_BASE` (prefix for `/api/...`) and `SOCKET_URL`. Both are empty when self-hosted.
   - `/api/...` requests use `credentials: 'include'`, so a deployment can put the API on another origin and still send its cookie.
   - The player page fetches `/api/content/public?joinToken=<token>`, so a multi-account deployment knows whose content the game uses. Self-hosted ignores the query string.
+  - The DM handout library mirrors scene templates: `GET/POST /api/handouts` and `GET/PUT/DELETE /api/handouts/:id`. The list items are `{ id, title, image, hasText, updatedAt, builtIn? }`. `PUT` and `DELETE` on a `builtin:` id return 400.
+  - `GET /api/adventures` returns `[{ id, name, description, scenes, handouts }]` (scene and handout counts). `POST /api/games` also accepts `{ adventureId }`.
+  - The asset folders are `backgrounds`, `tokens`, `images` and `handouts`.
 - **`client/js/transport.js`:** `connect(namespace, auth)` returns `{ on(event, fn), request(event, payload, { timeoutMs }) → Promise, setAuth(auth) }`.
 
 | Namespace | `auth` | Client → server requests (reply) | Server → client events |
@@ -113,6 +120,7 @@ The browser code in `client/` is shared. Two files are per-deployment:
 | `/dm/login` | `login.html` | `?next=` is where to go after login (default `/dm`) |
 | `/dm/games/:id` | `dm-game.html` | |
 | `/dm/scenes/:id` | `scene-editor.html` | |
+| `/dm/handouts/:id` | `handout-editor.html` | Ids may be `builtin:…` (opens read-only) |
 | `/dm/assets`, `/dm/data` | `assets.html`, `data.html` | |
 | `/g/:token` | `play.html` | Player page, with link-preview tags |
 

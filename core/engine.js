@@ -9,7 +9,9 @@ import { stripMarkers } from './helpers.js';
 //
 // deps (all synchronous):
 //   content    { def(kind, id), act(id), item(inv) }   definition lookups
-//   templates  { get(id) }                              scene template lookup
+//   templates  { get(id) }                              scene template lookup (library + built-in)
+//   handouts   { get(id) }                              handout library lookup (library + built-in)
+//   adventures { get(id) }                              built-in adventure lookup
 //   settings   { roleStrength }                         per-server / per-account settings
 //   rng        (sides) => 1..sides                      dice
 //   now        ms timestamp for this command
@@ -64,7 +66,7 @@ function makeCtx(state, actor, cmd, deps) {
   const isDm = actor.role === 'dm';
   const ctx = {
     state, actor, cmd, player,
-    content: deps.content, templates: deps.templates, settings: deps.settings, rng: deps.rng, now: deps.now,
+    content: deps.content, templates: deps.templates, handouts: deps.handouts, adventures: deps.adventures, settings: deps.settings, rng: deps.rng, now: deps.now,
     actorName: isDm ? 'DM' : player?.name ?? 'System',
     actorColor: isDm ? DM_COLOR : player?.color ?? null,
     events: [], fxs: [],

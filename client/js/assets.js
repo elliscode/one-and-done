@@ -8,6 +8,7 @@ const FOLDERS = [
   { id: 'backgrounds', label: '🗺 Backgrounds' },
   { id: 'tokens', label: '◉ Tokens' },
   { id: 'images', label: '🖼 Images' },
+  { id: 'handouts', label: '📜 Handouts' },
 ];
 let folder = FOLDERS.some((f) => f.id === location.hash.slice(1)) ? location.hash.slice(1) : 'backgrounds';
 let files = {};

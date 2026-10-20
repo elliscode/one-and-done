@@ -21,6 +21,7 @@ test('pages: landing at /, the DM app under /dm, old paths redirect with their q
     for (const [path, marker] of [
       ['/dm', 'js/home.js'], ['/dm/', 'js/home.js'], ['/dm/login', 'js/login.js'], ['/dm/games/g_1', 'js/dm.js'],
       ['/dm/scenes/tpl_1', 'js/editor.js'], ['/dm/assets', 'js/assets.js'], ['/dm/data', 'js/data.js'],
+      ['/dm/handouts/ho_1', 'js/handout-editor.js'],
     ]) {
       const r = await get(path);
       assert.equal(r.status, 200, path);

@@ -3,6 +3,13 @@ import { readdirSync, readFileSync, existsSync, writeFileSync, renameSync, unlin
 import { join } from 'node:path';
 import { CATEGORIES, FOLDER_CATEGORIES, SINGLE_FILES, FILE_RE, validateDefs, findItem, itemView } from '../core/content.js';
 import { publicRoles } from '../core/roles.js';
+import { normalizeTemplate } from '../core/templates.js';
+import { normalizeHandout, validateAdventure } from '../core/handouts.js';
+
+// Read-only built-in library content shipped in git: scene templates, handouts and adventures.
+// Each file holds one item; its id is "builtin:<file name without .json>".
+export const BUILTIN_FOLDERS = ['scenes', 'handouts', 'adventures'];
+export const BUILTIN_PREFIX = 'builtin:';
 
 export class ContentError extends Error {
   constructor(message, { errors = [], warnings = [], status = 400 } = {}) {
@@ -66,6 +73,51 @@ export function loadContent(dir, { staticDir = null, watchFiles = false, pollMs 
     return { files, errors: [...errors, ...v.errors], warnings: v.warnings };
   }
 
+  function builtinFiles(kind) {
+    const d = folder(kind);
+    return existsSync(d) ? readdirSync(d).filter((f) => FILE_RE.test(f)).sort() : [];
+  }
+
+  // Loads every built-in. Bad files are errors (like bad definitions); an adventure that points at
+  // a missing built-in is a warning and is left out, as is a scene creature with an unknown def.
+  function readBuiltins(lists) {
+    const errors = [];
+    const warnings = [];
+    const out = { scenes: new Map(), handouts: new Map(), adventures: new Map() };
+    const parse = {
+      scenes: (json, id) => { const { name, data } = normalizeTemplate(json); return { id, name, data, builtIn: true }; },
+      handouts: (json, id) => { const { title, data } = normalizeHandout(json); return { id, title, data, builtIn: true }; },
+      adventures: (json, id) => ({ id, ...validateAdventure(json), builtIn: true }),
+    };
+    for (const kind of BUILTIN_FOLDERS) {
+      for (const file of builtinFiles(kind)) {
+        const id = `${BUILTIN_PREFIX}${file.slice(0, -'.json'.length)}`;
+        try {
+          out[kind].set(id, parse[kind](JSON.parse(readFileSync(join(folder(kind), file), 'utf8')), id));
+        } catch (e) {
+          errors.push(`${kind}/${file}: ${e instanceof SyntaxError ? 'invalid JSON — ' : ''}${e.message}`);
+        }
+      }
+    }
+    const known = { monster: new Set(lists.monsters.map((d) => d.id)), npc: new Set(lists.npcs.map((d) => d.id)) };
+    for (const sc of out.scenes.values()) {
+      for (const e of sc.data.entities) {
+        if (!known[e.kind]?.has(e.defId)) warnings.push(`scenes/${sc.id.slice(BUILTIN_PREFIX.length)}.json: unknown ${e.kind} "${e.defId}" (skipped when added)`);
+      }
+    }
+    for (const adv of [...out.adventures.values()]) {
+      const missing = [
+        ...adv.scenes.map((s) => s.template).filter((t) => !out.scenes.has(t)),
+        ...adv.handouts.filter((h) => !out.handouts.has(h)),
+      ];
+      if (missing.length) {
+        warnings.push(`adventures/${adv.id.slice(BUILTIN_PREFIX.length)}.json: missing ${missing.join(', ')} — adventure hidden`);
+        out.adventures.delete(adv.id);
+      }
+    }
+    return { builtins: out, errors, warnings };
+  }
+
   function build(override) {
     const result = { errors: [], warnings: [], lists: {}, perFile: {} };
     for (const category of CATEGORIES) {
@@ -75,6 +127,10 @@ export function loadContent(dir, { staticDir = null, watchFiles = false, pollMs 
       result.lists[category] = r.files.flatMap((f) => (Array.isArray(f.defs) ? f.defs : []));
       result.perFile[category] = r.files.map((f) => ({ name: f.file, count: Array.isArray(f.defs) ? f.defs.length : 0 }));
     }
+    const b = readBuiltins(result.lists);
+    result.builtins = b.builtins;
+    result.errors.push(...b.errors);
+    result.warnings.push(...b.warnings);
     return result;
   }
 
@@ -84,8 +140,9 @@ export function loadContent(dir, { staticDir = null, watchFiles = false, pollMs 
       characters: r.lists.characters, monsters: r.lists.monsters, npcs: r.lists.npcs, acts: r.lists.acts,
       items: r.lists.items, itemViews: r.lists.items.map(itemView),
       maps: { character: index(r.lists.characters), monster: index(r.lists.monsters), npc: index(r.lists.npcs) },
+      builtins: r.builtins,
     };
-    const snap = JSON.stringify(r.lists);
+    const snap = JSON.stringify([r.lists, ...BUILTIN_FOLDERS.map((k) => [...r.builtins[k].values()])]);
     const changed = snap !== snapshot;
     snapshot = snap;
     return changed;
@@ -103,6 +160,13 @@ export function loadContent(dir, { staticDir = null, watchFiles = false, pollMs 
     // DM-added items carry only a name, e.g. "Healing Potion").
     item(inv) { return findItem(data.items, inv); },
     publicContent(roleStrength) { return { characters: data.characters, acts: data.acts, items: data.itemViews, roles: publicRoles(roleStrength) }; },
+    // Built-in library content (read-only; edited in git).
+    scene(id) { return data.builtins.scenes.get(id) ?? null; },
+    scenes() { return [...data.builtins.scenes.values()]; },
+    handout(id) { return data.builtins.handouts.get(id) ?? null; },
+    handouts() { return [...data.builtins.handouts.values()]; },
+    adventure(id) { return data.builtins.adventures.get(id) ?? null; },
+    adventures() { return [...data.builtins.adventures.values()]; },
     dmContent() { return { characters: data.characters, monsters: data.monsters, npcs: data.npcs, acts: data.acts, items: data.itemViews }; },
 
     // Re-reads everything. Invalid content is rejected and the last good content stays loaded.
@@ -183,13 +247,17 @@ export function loadContent(dir, { staticDir = null, watchFiles = false, pollMs 
         console.warn(`cannot watch ${path}: ${e.message}`);
       }
     };
-    for (const c of FOLDER_CATEGORIES) tryWatch(folder(c), (n) => n.endsWith('.json'));
+    for (const c of [...FOLDER_CATEGORIES, ...BUILTIN_FOLDERS]) tryWatch(folder(c), (n) => n.endsWith('.json'));
     tryWatch(dir, (n) => Object.values(SINGLE_FILES).includes(n));
     // fs.watch can miss events (notably on macOS right after a watch starts), so also compare a
     // cheap signature of the content files every few seconds.
-    const signature = () => CATEGORIES.flatMap((c) => fileNames(c).map((f) => {
-      try { const st = statSync(pathOf(c, f)); return `${c}/${f}:${st.mtimeMs}:${st.size}`; } catch { return `${c}/${f}`; }
-    })).join('|');
+    const stamp = (path, label) => {
+      try { const st = statSync(path); return `${label}:${st.mtimeMs}:${st.size}`; } catch { return label; }
+    };
+    const signature = () => [
+      ...CATEGORIES.flatMap((c) => fileNames(c).map((f) => stamp(pathOf(c, f), `${c}/${f}`))),
+      ...BUILTIN_FOLDERS.flatMap((k) => builtinFiles(k).map((f) => stamp(join(folder(k), f), `${k}/${f}`))),
+    ].join('|');
     let last = signature();
     pollTimer = setInterval(() => {
       const now = signature();

@@ -18,6 +18,7 @@
     <div class="tabs">
       <button data-tab="games" class="active">🎲 Games</button>
       <button data-tab="scenes">🗺️ Scenes</button>
+      <button data-tab="handouts">📜 Handouts</button>
       <span class="grow"></span>
       <a class="btn" href="/dm/assets">🖼 Assets</a>
       <a class="btn" href="/dm/data">📜 Data</a>
@@ -27,6 +28,7 @@
         <input id="new-game-name" class="grow" placeholder="New one-shot name, e.g. The Goblin Caves" maxlength="60">
         <button class="primary" type="submit">Create game</button>
       </form>
+      <div class="adventure-bar" id="adventures"></div>
       <div class="list" id="games"></div>
     </section>
     <section id="tab-scenes" class="hidden">
@@ -35,6 +37,13 @@
         <button class="primary" id="new-scene">New scene</button>
       </div>
       <div class="list" id="scenes"></div>
+    </section>
+    <section id="tab-handouts" class="hidden">
+      <div class="row" style="margin-bottom:14px">
+        <p class="muted grow">Handouts are notes, letters, maps and clues. Add one to a game, then reveal it to the players when the story gets there.</p>
+        <button class="primary" id="new-handout">New handout</button>
+      </div>
+      <div class="list" id="handouts"></div>
     </section>
   </div>
   <script type="module" src="/js/home.js"></script>

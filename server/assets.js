@@ -1,7 +1,7 @@
 import { readdirSync, statSync, existsSync, writeFileSync, renameSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const ASSET_FOLDERS = ['backgrounds', 'tokens', 'images'];
+export const ASSET_FOLDERS = ['backgrounds', 'tokens', 'images', 'handouts'];
 export const MAX_ASSET_BYTES = 15 * 1024 * 1024;
 const NAME_RE = /^[a-z0-9][a-z0-9._-]*\.(png|jpe?g|gif|webp|svg)$/;
 

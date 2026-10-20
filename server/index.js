@@ -8,6 +8,7 @@ import { loadContent, ContentError } from './content.js';
 import { createAssetStore, AssetError, MAX_ASSET_BYTES } from './assets.js';
 import { createAuth, DM_COOKIE } from './auth.js';
 import { TemplateStore } from './templates.js';
+import { HandoutStore } from './handouts.js';
 import { GameService } from './games/service.js';
 import { GameError } from '../core/state.js';
 import { attachSockets } from './sockets.js';
@@ -48,8 +49,10 @@ export function createServer({
   const content = loadContent(contentDir, { staticDir, watchFiles: watchContent });
   const assets = createAssetStore(staticDir);
   const auth = createAuth({ password, secret });
-  const templates = new TemplateStore(db);
-  const service = new GameService({ db, content, templates, settings, graceMs });
+  const templates = new TemplateStore(db, { builtins: content });
+  const handouts = new HandoutStore(db, { builtins: content });
+  const adventures = { get: (id) => content.adventure(id) };
+  const service = new GameService({ db, content, templates, handouts, adventures, settings, graceMs });
   service.restoreAll();
 
   const app = express();
@@ -96,6 +99,7 @@ export function createServer({
   // ---- assets (static art) ----
   const assetUsage = () => {
     const counts = templates.imageRefs();
+    for (const [path, n] of handouts.imageRefs()) counts.set(path, (counts.get(path) ?? 0) + n);
     for (const d of [...content.characters, ...content.monsters, ...content.npcs]) {
       if (d.image) counts.set(d.image, (counts.get(d.image) ?? 0) + 1);
     }
@@ -151,9 +155,25 @@ export function createServer({
   app.put('/api/scenes/:id', requireDm, handle((req) => templates.update(req.params.id, req.body)));
   app.delete('/api/scenes/:id', requireDm, handle((req) => ({ ok: templates.delete(req.params.id) })));
 
+  // ---- handout library ----
+  app.get('/api/handouts', requireDm, handle(() => handouts.list()));
+  app.post('/api/handouts', requireDm, handle((req) => handouts.create(req.body)));
+  app.get('/api/handouts/:id', requireDm, (req, res) => {
+    const ho = handouts.get(req.params.id);
+    if (ho) res.json(ho);
+    else res.status(404).json({ error: 'Handout not found' });
+  });
+  app.put('/api/handouts/:id', requireDm, handle((req) => handouts.update(req.params.id, req.body)));
+  app.delete('/api/handouts/:id', requireDm, handle((req) => ({ ok: handouts.delete(req.params.id) })));
+
+  // ---- built-in adventures ----
+  app.get('/api/adventures', requireDm, handle(() => content.adventures()
+    .map(({ id, name, description, scenes, handouts: hs }) => ({ id, name, description, scenes: scenes.length, handouts: hs.length }))
+    .sort((a, b) => a.name.localeCompare(b.name))));
+
   // ---- games ----
   app.get('/api/games', requireDm, handle(() => service.listGames()));
-  app.post('/api/games', requireDm, handle((req) => service.createGame(req.body?.name)));
+  app.post('/api/games', requireDm, handle((req) => service.createGame(req.body?.name, { adventureId: req.body?.adventureId ?? null })));
   app.delete('/api/games/:id', requireDm, handle((req) => ({ ok: service.deleteGame(req.params.id) })));
 
   // ---- pages ----
@@ -168,6 +188,7 @@ export function createServer({
   app.get('/dm', page('index.html'));
   app.get('/dm/login', page('login.html'));
   app.get('/dm/scenes/:id', page('scene-editor.html'));
+  app.get('/dm/handouts/:id', page('handout-editor.html'));
   app.get('/dm/games/:id', page('dm-game.html'));
   app.get('/dm/assets', page('assets.html'));
   app.get('/dm/data', page('data.html'));

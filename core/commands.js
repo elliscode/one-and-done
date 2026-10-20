@@ -3,6 +3,7 @@ import {
   PLAYER_COLORS, fail, newId, randomToken, entityFromDef, entitiesInScene, isFriendly, makeItem, turnFor, areEnemies,
 } from './state.js';
 import { inBounds, ensurePlaced } from './placement.js';
+import { normalizeHandout, MAX_HANDOUTS } from './handouts.js';
 import { startCombat, advancePhase, endCombat, applyHeal, applyDamage, setHp, revive, kill, dealDamage, deathAt } from './combat.js';
 import { addEffect, clearStatus, removeEffect, effectsOf, movementAllowance } from './status.js';
 import { activateAbility, runAbility, strike, checkTaunt, resolveCheck, onPhaseTransition, STATUSES } from './effects.js';
@@ -150,16 +151,16 @@ def('dm.renameGame', { who: 'dm' }, (ctx) => {
 
 // ---------- scenes ----------
 
-def('scene.add', { who: 'dm', clearsUndo: true }, (ctx) => {
-  const tpl = ctx.templates.get(ctx.cmd.templateId);
-  if (!tpl) fail('Unknown scene template');
+// Adds a live copy of a scene template to the game (scene.add, adventure.load). Returns the scene.
+function addSceneFromTemplate(ctx, tpl, name = null) {
   const data = structuredClone(tpl.data);
   const sameName = Object.values(ctx.state.scenes).filter((s) => s.templateId === tpl.id).length;
   const id = newId('s');
+  const base = name ?? tpl.name;
   const scene = {
     id,
     templateId: tpl.id,
-    name: sameName ? `${tpl.name} (${sameName + 1})` : tpl.name,
+    name: sameName ? `${base} (${sameName + 1})` : base,
     background: data.background ?? null,
     grid: data.grid,
     spawn: data.spawn ?? null,
@@ -176,8 +177,15 @@ def('scene.add', { who: 'dm', clearsUndo: true }, (ctx) => {
     ctx.state.entities[e.id] = e;
   }
   ensurePlaced(ctx.state, id);
+  return scene;
+}
+
+def('scene.add', { who: 'dm', clearsUndo: true }, (ctx) => {
+  const tpl = ctx.templates.get(ctx.cmd.templateId);
+  if (!tpl) fail('Unknown scene template');
+  const scene = addSceneFromTemplate(ctx, tpl);
   ctx.log('scene', `DM added scene "${scene.name}"`, { dmOnly: true });
-  return { sceneId: id };
+  return { sceneId: scene.id };
 });
 
 def('scene.remove', { who: 'dm', clearsUndo: true }, (ctx) => {
@@ -214,6 +222,100 @@ def('scene.activate', { who: 'dm', clearsUndo: true }, (ctx) => {
   } else {
     ctx.log('scene', 'The DM cleared the active scene');
   }
+});
+
+// ---------- handouts ----------
+
+function getHandout(ctx, id) {
+  const ho = ctx.state.handouts[id];
+  if (!ho) fail('Unknown handout');
+  return ho;
+}
+
+// Copies normalized handout data into the game (hidden until the DM reveals it).
+function addHandout(ctx, { title, data }, sourceId = null) {
+  if (ctx.state.handoutOrder.length >= MAX_HANDOUTS) fail(`A game can hold at most ${MAX_HANDOUTS} handouts`);
+  const id = newId('h');
+  ctx.state.handouts[id] = { id, sourceId, title, ...data, revealed: false };
+  ctx.state.handoutOrder.push(id);
+  return ctx.state.handouts[id];
+}
+
+function libraryHandout(ctx, id) {
+  const ho = ctx.handouts?.get(id);
+  if (!ho) fail('Unknown handout');
+  return ho;
+}
+
+def('handout.add', { who: 'dm' }, (ctx) => {
+  const src = libraryHandout(ctx, ctx.cmd.handoutId);
+  const ho = addHandout(ctx, normalizeHandout({ title: src.title, ...src.data }), src.id);
+  ctx.log('handout', '', { dmText: `DM added handout "${ho.title}"`, dmOnly: true });
+  return { handoutId: ho.id };
+});
+
+def('handout.create', { who: 'dm' }, (ctx) => {
+  const ho = addHandout(ctx, normalizeHandout(ctx.cmd));
+  ctx.log('handout', '', { dmText: `DM wrote handout "${ho.title}"`, dmOnly: true });
+  return { handoutId: ho.id };
+});
+
+// Edits the game's copy; the library handout it came from is unchanged.
+def('handout.update', { who: 'dm' }, (ctx) => {
+  const ho = getHandout(ctx, ctx.cmd.handoutId);
+  const pick = (k) => (ctx.cmd[k] !== undefined ? ctx.cmd[k] : ho[k]);
+  const { title, data } = normalizeHandout({ title: pick('title'), text: pick('text'), image: pick('image'), dmNotes: pick('dmNotes') });
+  Object.assign(ho, { title }, data);
+});
+
+def('handout.reveal', { who: 'dm' }, (ctx) => {
+  const ho = getHandout(ctx, ctx.cmd.handoutId);
+  if (ho.revealed) return;
+  ho.revealed = true;
+  ctx.log('handout', `📜 The DM shared "${ho.title}"`, { data: { handoutId: ho.id } });
+});
+
+def('handout.hide', { who: 'dm' }, (ctx) => {
+  const ho = getHandout(ctx, ctx.cmd.handoutId);
+  if (!ho.revealed) return;
+  ho.revealed = false;
+  ctx.log('handout', '', { dmText: `DM hid handout "${ho.title}" from players`, dmOnly: true });
+});
+
+def('handout.remove', { who: 'dm' }, (ctx) => {
+  const ho = getHandout(ctx, ctx.cmd.handoutId);
+  delete ctx.state.handouts[ho.id];
+  ctx.state.handoutOrder = ctx.state.handoutOrder.filter((h) => h !== ho.id);
+  ctx.log('handout', '', { dmText: `DM removed handout "${ho.title}"`, dmOnly: true });
+});
+
+// ---------- adventures ----------
+
+// Sets up a fresh game from a built-in adventure: every scene in order, every handout, then the
+// start scene. Everything is resolved before anything changes, so a broken adventure fails whole.
+def('adventure.load', { who: 'dm', clearsUndo: true }, (ctx) => {
+  const adv = ctx.adventures?.get(ctx.cmd.adventureId);
+  if (!adv) fail('Unknown adventure');
+  if (ctx.state.sceneOrder.length || ctx.state.handoutOrder.length) fail('Adventures can only be loaded into an empty game');
+  const scenes = adv.scenes.map((s) => {
+    const tpl = ctx.templates.get(s.template);
+    if (!tpl) fail(`This adventure needs the scene "${s.template}", which doesn't exist`);
+    return { ...s, tpl };
+  });
+  const handouts = adv.handouts.map((id) => {
+    const ho = ctx.handouts?.get(id);
+    if (!ho) fail(`This adventure needs the handout "${id}", which doesn't exist`);
+    return ho;
+  });
+  const ids = {};
+  for (const s of scenes) ids[s.key] = addSceneFromTemplate(ctx, s.tpl, s.name ?? null).id;
+  for (const ho of handouts) addHandout(ctx, normalizeHandout({ title: ho.title, ...ho.data }), ho.id);
+  const start = adv.startScene ? ids[adv.startScene] : ids[scenes[0].key];
+  ctx.state.activeSceneId = start;
+  ensurePlaced(ctx.state, start);
+  ctx.log('scene', '', { dmText: `DM loaded the adventure "${adv.name}"`, dmOnly: true });
+  ctx.log('scene', `The party enters ${ctx.state.scenes[start].name}`);
+  return { sceneIds: Object.values(ids) };
 });
 
 // ---------- entities (DM) ----------

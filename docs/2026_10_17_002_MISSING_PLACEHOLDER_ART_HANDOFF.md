@@ -38,7 +38,7 @@ While preparing the cloud deployment, every `/static/...` path the code refers t
    - **b.** Bring back only the generated `chest.svg` (`node scripts/gen-placeholders.js`, then commit just `static/images/chest.svg`).
 2. **New-scene default background:**
    - **a.** No default: `background: null`. The editor already handles a scene with no background.
-   - **b.** One of the real backgrounds, for example `/static/backgrounds/training-ground.webp`.
+   - **b.** One of the real backgrounds, for example `/static/backgrounds/misc-training-ground.webp`.
    - **c.** Bring back the generated `dungeon.svg`.
 3. **The placeholder generator:** keep it as an optional tool and fix the README wording, or delete it now that real art exists?
 4. **Examples and fixtures:** point the `data.js` examples at real art, for example a `/static/tokens/monster_0NN.webp` that exists. Should fixtures stay as they are, since tests don't need real images?

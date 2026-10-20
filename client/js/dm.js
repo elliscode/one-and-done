@@ -4,6 +4,7 @@ import { Board } from './board.js';
 import { GameFeed } from './panel.js';
 import { startAbility, abilitySummary, distance } from './abilities.js';
 import { createPredictor } from './predict.js';
+import { openReader, pickImage } from './handouts.js';
 
 const gameId = location.pathname.split('/').pop();
 const me = await api('GET', '/api/me');
@@ -18,6 +19,7 @@ let selectedId = null;
 let mode = null; // {type:'place', kind, def, scope} | {type:'target'|'cell', label, range, origin, ...}
 let spawnScope = 'scene';
 let templates = [];
+let library = []; // the handout library (for "Add from library")
 
 const socket = connect('/dm', { gameId });
 const send = (cmd) => sendCmd(socket, cmd);
@@ -42,6 +44,7 @@ socket.on('contentChanged', async () => {
   heroById = new Map(content.characters.map((c) => [c.id, c]));
   memoKeys.banks = memoKeys.players = null;
   loadTemplates();
+  loadLibrary();
   if (state) render();
 });
 socket.on('fatal', (msg) => { toast(msg, 'error'); setTimeout(() => { location.href = '/dm'; }, 1500); });
@@ -265,14 +268,88 @@ function undo() {
 for (const b of $$('.side-tabs button')) {
   b.addEventListener('click', () => {
     for (const o of $$('.side-tabs button')) o.classList.toggle('active', o === b);
-    for (const t of ['scenes', 'players', 'banks']) $(`#tab-${t}`).classList.toggle('hidden', t !== b.dataset.tab);
+    for (const t of ['scenes', 'players', 'banks', 'handouts']) $(`#tab-${t}`).classList.toggle('hidden', t !== b.dataset.tab);
     if (b.dataset.tab === 'scenes') loadTemplates();
+    if (b.dataset.tab === 'handouts') loadLibrary();
   });
 }
 
 async function loadTemplates() {
   templates = await api('GET', '/api/scenes');
   if (state) renderScenes();
+}
+
+async function loadLibrary() {
+  library = await api('GET', '/api/handouts');
+  if (state) renderHandouts();
+}
+
+// ---------- handouts ----------
+
+const gameHandouts = () => state.handoutOrder.map((id) => state.handouts[id]).filter(Boolean);
+let reader = null;
+
+function renderHandouts() {
+  const list = gameHandouts();
+  if (reader?.open) reader.refresh(list);
+  const pick = h('select.grow', {}, ...library.map((ho) => h('option', { value: ho.id }, `${ho.title}${ho.builtIn ? ' (built-in)' : ''}`)));
+  fill($('#tab-handouts'),
+    h('div.section-title', {}, 'Handouts in this game'),
+    ...(list.length ? list.map((ho) => h(`div.scene-item.handout-item${ho.revealed ? '.active' : ''}`, {},
+      h('span.name', { title: ho.revealed ? 'Players can read this' : 'Hidden from players' }, `${ho.revealed ? '👁 ' : ''}${ho.title}`),
+      ho.revealed
+        ? h('button.small', { title: 'Hide from players', onclick: () => send({ type: 'handout.hide', handoutId: ho.id }) }, 'Hide')
+        : h('button.small.primary', { title: 'Show to every player', onclick: () => send({ type: 'handout.reveal', handoutId: ho.id }) }, 'Reveal'),
+      h('button.small', { title: 'Read it as players see it', onclick: () => { reader = openReader(gameHandouts(), { startId: ho.id }); } }, '👁'),
+      h('button.small', { title: 'Edit this game\'s copy', onclick: () => editHandout(ho) }, '✎'),
+      h('button.small.danger', {
+        title: 'Remove from game',
+        onclick: () => confirm(`Remove "${ho.title}" from this game? The library copy is kept.`) && send({ type: 'handout.remove', handoutId: ho.id }),
+      }, '✕'))) : [h('p.muted', {}, 'No handouts yet.')]),
+    h('div.section-title', {}, 'Add from library'),
+    library.length
+      ? h('div.row', {}, pick, h('button.primary.small', { onclick: () => send({ type: 'handout.add', handoutId: pick.value }) }, 'Add'))
+      : h('p.muted', {}, 'Your handout library is empty. ', h('a', { href: '/dm#handouts' }, 'Write a handout'), ' first.'),
+    h('button.small', { style: { marginTop: '8px' }, onclick: () => editHandout(null) }, '+ Quick note'),
+    h('p.muted', { style: { fontSize: '12px' } }, 'Each added handout is this game\'s own copy. Players see only what you reveal, never DM notes.'));
+}
+
+let assetPaths = null;
+// Edit a game's handout (or write a new one when ho is null) in a small form.
+async function editHandout(ho) {
+  closeMenu();
+  let image = ho?.image ?? null;
+  const title = h('input', { value: ho?.title ?? '', maxLength: 80, placeholder: 'Title' });
+  const text = h('textarea', { rows: 10, placeholder: 'Markdown text' });
+  text.value = ho?.text ?? '';
+  const notes = h('textarea', { rows: 3, placeholder: 'Secrets, reminders, when to reveal it…' });
+  notes.value = ho?.dmNotes ?? '';
+  const cover = h('div.row');
+  const drawCover = () => fill(cover,
+    image ? h('img.cover-thumb', { src: image, alt: '' }) : h('span.muted', {}, 'No cover image'),
+    h('button.small', {
+      onclick: async () => {
+        assetPaths ??= await api('GET', '/api/assets');
+        const p = await pickImage(assetPaths, { title: 'Cover image' });
+        if (p) { image = p; drawCover(); }
+      },
+    }, image ? 'Change' : 'Pick image'),
+    image ? h('button.small', { onclick: () => { image = null; drawCover(); } }, 'Remove') : null);
+  drawCover();
+  const close = () => backdrop.remove();
+  const save = async () => {
+    const fields = { title: title.value, text: text.value, image, dmNotes: notes.value };
+    const r = await send(ho ? { type: 'handout.update', handoutId: ho.id, ...fields } : { type: 'handout.create', ...fields });
+    if (r) close();
+  };
+  const card = h('div.modal.handout-form', { role: 'dialog', 'aria-modal': 'true' },
+    h('div.modal-title', {}, ho ? 'Edit handout' : 'Quick note'),
+    title, h('div.section-title', {}, 'Cover image'), cover, h('div.section-title', {}, 'Text'), text,
+    h('div.section-title', {}, 'DM notes (never shown to players)'), notes,
+    h('div.modal-actions', {}, h('button.small', { onclick: close }, 'Cancel'), h('button.small.primary', { onclick: save }, 'Save')));
+  const backdrop = h('div.modal-backdrop', { onclick: (e) => { if (e.target === backdrop) close(); } }, card);
+  document.body.append(backdrop);
+  title.focus();
 }
 
 function renderScenes() {
@@ -541,6 +618,7 @@ function render() {
   renderTop();
   memo('scenes', [state.scenes, state.sceneOrder, state.activeSceneId, templates, ents.map((e) => [e.scope, e.sceneId])], renderScenes);
   memo('players', [state.players, state.options], renderPlayers);
+  memo('handouts', [state.handouts, state.handoutOrder, library], renderHandouts);
   memo('banks', [spawnScope, state.activeSceneId, state.combat, state.turn, ents.filter((e) => e.kind !== 'pc').map((e) => [e.id, e.name, e.hp, e.status, e.scope, e.sceneId, e.damageTaken])], renderBanks);
   renderBoard();
   const sel = selected();
@@ -548,3 +626,4 @@ function render() {
 }
 
 loadTemplates();
+loadLibrary();

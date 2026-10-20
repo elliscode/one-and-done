@@ -1,0 +1,2 @@
+{ "name": "Fixture Cave", "grid": { "cols": 8, "rows": 6 }, "spawn": { "x": 1, "y": 1 },
+  "entities": [{ "kind": "monster", "defId": "rat", "x": 5, "y": 4 }] }

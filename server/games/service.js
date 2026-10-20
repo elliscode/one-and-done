@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { randomBytes, randomInt } from 'node:crypto';
 import { transaction } from '../db.js';
-import { DM_COLOR, newId, createGameState, upgradeState } from '../../core/state.js';
+import { DM_COLOR, newId, createGameState, upgradeState, GameError } from '../../core/state.js';
 import { feedForRole } from '../../core/project.js';
 import { applyCommand, applyUndo, applyChat, checkPing, nextDeadline, UNDO_LIMIT, HISTORY_LIMIT } from '../../core/engine.js';
 
@@ -13,13 +13,16 @@ export class GameService extends EventEmitter {
   // stateless: never keep games in memory between calls, so every command reloads the game from
   // SQLite, as a serverless shell must. Used by `npm run test:stateless` to catch features that only
   // work because of the in-memory cache.
-  constructor({ db, content, templates, settings, now = Date.now, rng, graceMs = 60_000, stateless = false }) {
+  // handouts / adventures: { get(id) } lookups (optional; commands that need them fail cleanly).
+  constructor({ db, content, templates, handouts = null, adventures = null, settings, now = Date.now, rng, graceMs = 60_000, stateless = false }) {
     super();
     if (typeof settings?.get !== 'function') throw new Error('GameService needs a settings store ({ get() → { roleStrength } })');
     this.settings = settings;
     this.db = db;
     this.content = content;
     this.templates = templates;
+    this.handouts = handouts;
+    this.adventures = adventures;
     this.now = now;
     this.rng = rng ?? ((sides) => randomInt(1, sides + 1));
     this.graceMs = graceMs;
@@ -42,20 +45,32 @@ export class GameService extends EventEmitter {
           id: r.id, name: s.name, joinToken: r.join_token, createdAt: r.created_at, updatedAt: r.updated_at,
           players: Object.keys(s.players).length,
           scenes: s.sceneOrder.length,
+          handouts: s.handoutOrder?.length ?? 0,
           activeScene: s.activeSceneId ? s.scenes[s.activeSceneId]?.name : null,
           combat: s.combat.active,
         };
       });
   }
 
-  createGame(name) {
-    const clean = String(name ?? '').trim().slice(0, 60) || 'Untitled one-shot';
+  // With adventureId, the new game is set up from that built-in adventure (adventure.load). If that
+  // fails the game is deleted again, so a broken adventure never leaves a half-built game.
+  createGame(name, { adventureId = null } = {}) {
+    const adv = adventureId ? this.adventures?.get(adventureId) : null;
+    if (adventureId && !adv) throw new GameError('Unknown adventure');
+    const clean = String(name ?? '').trim().slice(0, 60) || adv?.name || 'Untitled one-shot';
     const id = newId('g');
     const joinToken = randomBytes(9).toString('base64url');
     const state = createGameState({ id, name: clean, joinToken });
     const t = this.now();
     this.db.prepare('INSERT INTO games (id, name, join_token, state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
       .run(id, clean, joinToken, JSON.stringify(state), t, t);
+    if (adv) {
+      const r = this.dispatch(id, { role: 'dm' }, { type: 'adventure.load', adventureId });
+      if (!r.ok) {
+        this.deleteGame(id);
+        throw new GameError(r.error);
+      }
+    }
     return { id, joinToken, name: clean };
   }
 
@@ -125,7 +140,10 @@ export class GameService extends EventEmitter {
   }
 
   deps() {
-    return { content: this.content, templates: this.templates, settings: this.settings.get(), rng: this.rng, now: this.now() };
+    return {
+      content: this.content, templates: this.templates, handouts: this.handouts, adventures: this.adventures,
+      settings: this.settings.get(), rng: this.rng, now: this.now(),
+    };
   }
 
   persist(game, events, { undo = null, clearUndo = false } = {}) {

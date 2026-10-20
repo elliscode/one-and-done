@@ -1,0 +1,6 @@
+{
+  "title": "Notice Board: Bounty",
+  "image": "/static/backgrounds/tgb-courtyard-battle-encounter.webp",
+  "text": "## REWARD: 50 GOLD\n\nBandits have been seen gathering in the **old courtyard** after dark, with *rats the size of dogs* following them around.\n\nAny brave soul who drives them out may claim the reward from the Captain of the Guard.\n\n— *By order of the Watch*",
+  "dmNotes": "Reveal when the party is done training. Then switch to the Courtyard Ambush scene and start combat."
+}

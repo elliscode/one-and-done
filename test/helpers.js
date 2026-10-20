@@ -4,6 +4,7 @@ import { openDb } from '../server/db.js';
 import { loadContent } from '../server/content.js';
 import { DEFAULT_ROLE_STRENGTH } from '../core/roles.js';
 import { TemplateStore } from '../server/templates.js';
+import { HandoutStore } from '../server/handouts.js';
 import { GameService } from '../server/games/service.js';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,11 +28,15 @@ const STATELESS = process.env.ONE_AND_DONE_STATELESS === '1';
 
 export function makeService({ dbFile = ':memory:', now, rng, settings = fixedSettings() } = {}) {
   const db = openDb(dbFile);
-  const templates = new TemplateStore(db);
+  const templates = new TemplateStore(db, { builtins: content });
+  const handouts = new HandoutStore(db, { builtins: content });
+  const adventures = { get: (id) => content.adventure(id) };
   const clock = { t: 1_000_000 };
   rng ??= scriptedRng();
-  const service = new GameService({ db, content, templates, settings, rng, now: now ?? (() => clock.t), stateless: STATELESS });
-  return { db, templates, service, clock, rng };
+  const service = new GameService({
+    db, content, templates, handouts, adventures, settings, rng, now: now ?? (() => clock.t), stateless: STATELESS,
+  });
+  return { db, templates, handouts, service, clock, rng };
 }
 
 export const DM = { role: 'dm' };

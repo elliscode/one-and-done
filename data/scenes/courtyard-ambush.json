@@ -1,0 +1,14 @@
+{
+  "name": "Courtyard Ambush",
+  "background": "/static/backgrounds/tgb-courtyard-battle-encounter.webp",
+  "bgScale": 1,
+  "grid": { "cols": 31, "rows": 21, "cellSize": 49, "offsetX": 0, "offsetY": 0, "color": "#ffffff", "opacity": 0.25 },
+  "spawn": { "x": 15, "y": 18 },
+  "entities": [
+    { "kind": "monster", "defId": "bandit-rogue", "x": 12, "y": 9 },
+    { "kind": "monster", "defId": "bandit-rogue", "x": 19, "y": 9 },
+    { "kind": "monster", "defId": "giant-rat", "x": 14, "y": 11 },
+    { "kind": "monster", "defId": "giant-rat", "x": 17, "y": 12 },
+    { "kind": "monster", "defId": "giant-rat", "x": 16, "y": 8 }
+  ]
+}

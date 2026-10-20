@@ -21,12 +21,15 @@ npm run test:stateless    # the same tests with no in-memory game cache (serverl
 ## How it works
 
 - **Scenes** (DM home → Scenes) are reusable map templates. Each one has a background, an independent grid (columns, rows, cell size, offset), starting NPC/monster placements, and a player spawn square. The default spawn is the bottom-left square.
+- **Built-in adventures** (DM home → Games → **New game from adventure**) create a ready-to-play game with its scenes and handouts already added, e.g. the **Training Grounds** tutorial. Built-in scenes, handouts and adventures live in git under `data/scenes`, `data/handouts` and `data/adventures`, and are marked **Built-in** in the libraries; **Duplicate** makes an editable copy. See [docs/ADVENTURES.md](docs/ADVENTURES.md) for the file formats.
+- **Handouts** (DM home → Handouts) are notes, letters, maps and clues: Markdown text, a cover image, or both, with more images inline. Add them to a game, then **Reveal** them when the story gets there; players get a toast and read them from the **📜 Handouts** button. DM notes on a handout never reach players.
 - **Games** are actual adventures. When you add a scene to a game, the game gets its own live copy (a *scene instance*). Moving or hurting things in a game never changes the template, and editing the template later never changes games that already use it.
 - **Players** open the game link, enter a name, pick Tank / DPS / Heal, and then pick a hero. They can do all of this before the DM shows up. The browser remembers each seat as a `playerId` plus a server-issued secret, so refreshing or reconnecting puts the player back on the same hero. Name changes keep the seat, color, and hero. The **You** menu (their name chip, top-right) changes their name and color, and once they have a hero, renames the hero too. The new hero name shows on the token, in the party list and in the DM's Players tab. Releasing the hero resets the name. If the DM allows it, the You menu also has **Leave hero…**: after an "Are you sure?" prompt the hero leaves the game (any time, even mid-combat) and the player picks a hero again. The seat, name and color stay; the hero's HP, items and effects don't.
 - **DM controls** (Games → Open):
   - *Scenes tab:* add scenes, switch the active scene, remove scenes.
   - *Players tab:* see presence, change colors, **Release** (frees the hero so the player picks again), a **Let players leave their hero** switch (per game, off by default, can be changed mid-game), **✕** (removes the seat; that browser can't rejoin as that player).
   - *Banks tab:* place NPCs and monsters, choosing *scene* scope (stays in this scene) or *game* scope (follows the party).
+  - *Handouts tab:* add handouts from the library or write a quick note, then **Reveal** or **Hide** each one for all players, read it as players see it (👁), or edit this game's copy (✎).
   - *Board:* drag any token to move it. Click a stack to see every token in it, including the ones underneath. Click a token to open the inspector: damage, heal, set HP, kill, revive, scope, hostility, inventory, attacks, extra actions.
   - *Map navigation (everyone, and the scene editor):* trackpad: two-finger scroll pans, pinch zooms toward your fingers. Mouse: the wheel zooms toward the cursor, right-drag (or middle-drag) pans. Touch: one finger on the empty map pans, two fingers pinch. The **+**, **−** and **Fit** buttons are still there. Gestures over the map never scroll or zoom the page.
   - *iPad / iPhone:* the layout fits the screen that's actually visible (CSS `100dvh`, falling back to `100vh` on old browsers), so Safari's tab bar and address bar never cover the chat box or map controls, and it resizes when they appear, disappear, or the device rotates.
@@ -50,7 +53,7 @@ To generate new heroes, monsters or NPCs with an LLM, use the JSON Schemas in `s
 
 Manage content from the DM home page; no restart is needed:
 
-- **🖼 Assets** (`/dm/assets`): upload (drag and drop, several at once), replace, or delete art in `static/backgrounds`, `static/tokens`, and `static/images`. Files are checked to be real PNG, JPG, GIF, WebP, or SVG images (max 15 MB). Names get cleaned up, so `Swamp Map.png` becomes `swamp-map.png`. Each card shows how many scenes or definitions use that file.
+- **🖼 Assets** (`/dm/assets`): upload (drag and drop, several at once), replace, or delete art in `static/backgrounds`, `static/tokens`, `static/images`, and `static/handouts`. Files are checked to be real PNG, JPG, GIF, WebP, or SVG images (max 15 MB). Names get cleaned up, so `Swamp Map.png` becomes `swamp-map.png`. Each card shows how many scenes or definitions use that file.
 - **📜 Data** (`/dm/data`): edit, create, upload, download, or delete the definition JSON files. A save is checked against the rules below; if anything is invalid, nothing is written and you get a list of exact errors.
 
 Changes go live immediately. Open DM and player pages refresh their banks, hero picker, and Act menu by themselves; the scene editor has a **↻ Refresh assets & data** button. Edits made directly on disk are picked up too; a bad edit is logged and the last good content stays loaded. Tokens already in a game keep the stats they were created with; new spawns and hero picks use the new definitions. Everything is written into the repo's `data/` and `static/` folders, so changes show up in `git status` and you can commit them.
@@ -60,7 +63,8 @@ Changes go live immediately. Open DM and player pages refresh their banks, hero 
 | `data/characters/*.json` | Heroes (`role`: `tank` / `dps` / `heal`) |
 | `data/monsters/*.json`, `data/npcs/*.json` | Bank definitions (`size: {w,h}` for large creatures; NPC `hostile: true` hides their HP) |
 | `data/acts.json` | Generic actions in the Act menu (optional `roll`) |
-| `static/backgrounds`, `static/tokens`, `static/images` | Art, referenced as `/static/...` |
+| `data/scenes/`, `data/handouts/`, `data/adventures/` | Built-in scenes, handouts and adventures, one JSON file each (see [docs/ADVENTURES.md](docs/ADVENTURES.md)) |
+| `static/backgrounds`, `static/tokens`, `static/images`, `static/handouts` | Art, referenced as `/static/...` |
 
 Definitions can also set `actions` (actions per combat phase, default 1), and `"immortal": true` for training dummies. Attack fields: `attack` (to-hit dice), `damage`, `range` (squares), and optional `damageType`. Abilities use the effect schema described in [docs/ABILITIES.md](docs/ABILITIES.md). Older `heal`/`roll`/`free`/`grantsActions` fields still load. Dice notation: `NdX±M` with d4/d6/d8/d10/d12/d20, and terms can be chained (`1d8+1d6+2`). A natural 20 is a crit (damage dice doubled). A natural 1 always misses.
 
@@ -100,6 +104,7 @@ core/             the game engine: pure, synchronous, no I/O (shared with other 
   state.js        state shape, upgrades and helpers
   content.js      definition validation
   templates.js    scene template normalization
+  handouts.js     handout normalization and adventure validation
   dice.js         dice parser/roller
 server/           the self-hosted shell around core/
   index.js        HTTP routes, pages, startup
@@ -109,11 +114,12 @@ server/           the self-hosted shell around core/
   settings.js     data/settings.json (role strength)
   preview.js      link-preview (Open Graph) metadata for /g/<token>
   assets.js       art uploads for the Assets page
-  content.js      loads and watches data/ definitions
+  content.js      loads and watches data/ definitions and built-ins
   templates.js    scene template store
+  handouts.js     handout library store
   games/
     service.js    game cache, core engine → persist → broadcast, undo storage, timers, presence
-client/           vanilla JS pages (home, editor, DM game, player)
+client/           vanilla JS pages (home, scene and handout editors, DM game, player)
   js/transport.js the live game connection (Socket.IO here; swappable per deployment)
   js/config.js    API/socket base URLs (empty when self-hosted)
 test/             node:test suites

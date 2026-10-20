@@ -11,4 +11,5 @@ export { projectForDm, projectForPlayer, feedForRole, turnProgress } from './pro
 export { ROLE_STRENGTHS, DEFAULT_ROLE_STRENGTH, isValidRoleStrength, publicRoles, describeStrength } from './roles.js';
 export { CATEGORIES, FOLDER_CATEGORIES, SINGLE_FILES, FILE_RE, validateDefs, findItem, itemView } from './content.js';
 export { normalizeTemplate } from './templates.js';
+export { normalizeHandout, validateAdventure, MAX_HANDOUTS, HANDOUT_TITLE_MAX, HANDOUT_TEXT_MAX, HANDOUT_NOTES_MAX } from './handouts.js';
 export { rollDice, parseDice, isValidDice, DICE_SIDES, DiceError } from './dice.js';
